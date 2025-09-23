@@ -1,6 +1,7 @@
 import type {BookData} from "./Types";
 export const fakeBookData1 :BookData[] = [
 {
+    image: null,
     id: 1,
     title: "im gay",
     author: 'john gay',
@@ -19,6 +20,7 @@ export const fakeBookData1 :BookData[] = [
     title: "im even gay now",
     author: 'john gay',
     genre: 'romance',
-    tags: ['blue', 'danube']
+    tags: ['blue', 'danube'],
+    image:'fake_data/testbook1.png'
 }
 ]

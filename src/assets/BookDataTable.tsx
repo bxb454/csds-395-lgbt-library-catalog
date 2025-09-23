@@ -8,6 +8,16 @@ const BookDataTable = () => {
     const columns = useMemo<MRT_ColumnDef<BookData>[]>(
         () => [
             {
+                accessorKey: 'image',
+                header: 'image',
+                size: 150,
+                Cell: ({ cell }) => (
+                    <img
+                        src={cell.getValue()}
+                        style={{ width: 50, height: 50, borderRadius: '8px' }}
+                    />)
+            },
+            {
                 accessorKey: 'title',
                 header: 'title',
                 size: 150,
@@ -22,6 +32,16 @@ const BookDataTable = () => {
                 header: 'genre',
                 size: 200,
             },
+            {
+                accessorKey: 'copies',
+                header: 'copies',
+                size: 50,
+            },
+            {
+                accessorKey: 'available',
+                header: 'available',
+                size: 50,
+            }
 
         ],
         [],
