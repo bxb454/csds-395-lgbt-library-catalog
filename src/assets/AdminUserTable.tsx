@@ -45,10 +45,6 @@ const AdminUserTable = () => {
 
             // null,
             data,
-//            muiRowDragHandleProps: ({table}) => ({
-
-            // 2. Then add row styling that won't interfere with dragging
-            // muiTableBodyRowProps: ({row}) => ({}),
         });
 
         return (
