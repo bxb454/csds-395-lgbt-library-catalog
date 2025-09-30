@@ -18,10 +18,11 @@ CREATE TABLE authors(
     primary key(authID)
 ) AUTO_INCREMENT = 1000;
 
-CREATE TABLE tags(
+/*CREATE TABLE tags(
 	tag 	varchar(128) not null,
     primary key(tag)
-);
+);*/
+DROP TABLE IF EXISTS tags;
 
 CREATE TABLE bookAuthor(
 	bookID 	int not null,
@@ -35,9 +36,11 @@ CREATE TABLE booktags(
 	bookID 	int not null,
     tag 	varchar(128) not null,
     foreign key(bookID) references books(bookID),
-    foreign key(tag) references tags(tag),
+    #foreign key(tag) references tags(tag),
     primary key(bookID, tag)
 );
+
+ALTER TABLE booktags DROP FOREIGN KEY tag;
 
 CREATE TABLE users(
 	caseID varchar(8) not null,
@@ -56,5 +59,9 @@ CREATE TABLE loan(
     foreign key(caseID) references users(caseID),
     primary key(bookID, caseID, loanDate)
 )
+
+
+
+
 
     
