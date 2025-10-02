@@ -123,8 +123,42 @@ BEGIN
 END//
 
 DELIMITER //
-CREATE PROCEDURE removeTag (IN bookID INT, tag varchar(128))
+CREATE PROCEDURE removeTag (IN bookID INT, tag VARCHAR(128))
 BEGIN
 	DELETE FROM booktags bt WHERE bt.bookID = bookID AND bt.tag = tag;
+END//
+
+DELIMITER //
+CREATE PROCEDURE searchByAuth (IN search VARCHAR(255))
+BEGIN
+	SELECT books.* FROM books JOIN bookauthor ON books.bookID = bookauthor.bookID JOIN author ON author.authID = bookauthor.authID 
+    WHERE author.fname LIKE CONCAT('%', CONCAT(search, '%')) OR author.lname LIKE CONCAT('%', CONCAT(search, '%')); 
+END//
+
+DELIMITER //
+CREATE PROCEDURE searchByTags (IN search VARCHAR(255))
+BEGIN
+	SELECT books.* FROM books JOIN booktags ON books.bookID = booktags.bookID 
+    WHERE booktags.tag LIKE CONCAT('%', CONCAT(search, '%'));
+END//
+
+DELIMITER //
+CREATE PROCEDURE searchByTitle (IN search VARCHAR(255))
+BEGIN
+	SELECT * FROM books
+    WHERE books.title LIKE CONCAT('%', CONCAT(search, '%'));
+END//
+
+DELIMITER //
+CREATE PROCEDURE generalSearch (IN search VARCHAR(255))
+BEGIN
+		SELECT books.* FROM books JOIN booktags ON books.bookID = booktags.bookID 
+		WHERE booktags.tag LIKE CONCAT('%', CONCAT(search, '%'))
+	UNION
+		SELECT books.* FROM books JOIN bookauthor ON books.bookID = bookauthor.bookID JOIN author ON author.authID = bookauthor.authID 
+		WHERE author.fname LIKE CONCAT('%', CONCAT(search, '%')) OR author.lname LIKE CONCAT('%', CONCAT(search, '%'))
+    UNION
+    	SELECT books.* FROM books JOIN booktags ON books.bookID = booktags.bookID 
+		WHERE booktags.tag LIKE CONCAT('%', CONCAT(search, '%'));
 END//
 
