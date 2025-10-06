@@ -38,6 +38,7 @@ function App() {
         <BookDataTable editable={true}></BookDataTable>
 
         <h2> Users (admin view only)</h2>
+        <AdminUserTable></AdminUserTable>
 
     </>
   )

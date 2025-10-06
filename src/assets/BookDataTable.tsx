@@ -3,7 +3,7 @@ import {useMemo, useState} from "react";
 import {Button, IconButton, Box, } from "@mui/material";
 import { Delete, Edit } from '@mui/icons-material';
 import type {BookData} from "./Types.ts";
-import {fakeBookData1} from "./fake_bookdata"
+import {fakeBookData1} from "./fake_data.tsx"
 
 interface props {
     editable?: boolean;

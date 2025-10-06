@@ -1,24 +1,15 @@
 import {MaterialReactTable, type MRT_ColumnDef, useMaterialReactTable,} from "material-react-table";
 import {useMemo, useState} from "react";
-import type {BookData} from "./Types.ts";
+import type {UserData} from "./Types.ts";
+import {fakeUserData1} from "./fake_data.tsx";
 
 const AdminUserTable = () => {
 
-        const columns = useMemo<MRT_ColumnDef<BookData>[]>(
+        const columns = useMemo<MRT_ColumnDef<UserData>[]>(
             () => [
                 {
-                    accessorKey: 'image',
-                    header: 'image',
-                    size: 150,
-                    Cell: ({ cell }) => (
-                        <img
-                            src={cell.getValue()}
-                            style={{ width: 50, height: 50, borderRadius: '8px' }}
-                        />)
-                },
-                {
-                    accessorKey: 'name',
-                    header: 'User Name',
+                    accessorKey: 'caseID',
+                    header: 'CASE ID',
                     size: 150,
                 },
                 {
@@ -36,14 +27,15 @@ const AdminUserTable = () => {
             [],
         );
 
-       // const [data, setData] = useState<BookData[]>(fakeBookData1);
+       const [data, setData] = useState<UserData[]>(fakeUserData1);
 
         const table = useMaterialReactTable({
             columns,
             enableEditing: true,
-            editDisplayMode:"modal",
 
-            // null,
+
+
+            editDisplayMode:"modal",
             data,
         });
 
