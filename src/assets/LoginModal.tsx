@@ -1,14 +1,20 @@
 import React from 'react';
+import { UserData } from './Types';
+import { sampleUsers } from './sampleUsers';
 
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSignIn: () => void;
+  onSignIn: (user: UserData) => void;
 }
 
 //Placeholder for redirect to CWRU login portal
 const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSignIn }) => {
   if (!isOpen) return null;
+
+  const handleUserSelect = (user: UserData) => {
+    onSignIn(user);
+  };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -18,9 +24,16 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSignIn }) =>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
         <div className="modal-content">
-          <button className="signin-button" onClick={onSignIn}>
-            Sign In
-          </button>
+          <p>Select a sample user:</p>
+          {sampleUsers.map((user) => (
+            <button
+              key={user.id}
+              className="signin-button"
+              onClick={() => handleUserSelect(user)}
+            >
+              {user.caseID} ({user.role})
+            </button>
+          ))}
         </div>
       </div>
     </div>

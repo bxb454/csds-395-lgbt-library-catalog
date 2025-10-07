@@ -48,6 +48,7 @@
   padding: 0.5rem 1rem;
   background-color: blue;
   color: white;
+  z-index: 1000;
 }
 
 .modal-overlay {
@@ -86,4 +87,7 @@
   padding: 0.5rem 1rem;
   background-color: blue;
   color: white;
+  margin: 0.25rem;
+  display: block;
+  width: 100%;
 }
