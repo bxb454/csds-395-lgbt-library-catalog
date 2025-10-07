@@ -1,12 +1,13 @@
 package main
 
 import (
-	"bufio"
+	//"bufio"
 	"flag"
 	"fmt"
 	"log"
 	"os"
-	"strings"
+
+	//"strings"
 
 	//"./cas"
 	cas_test "github.com/bxb454/csds-395-lgbt-library-catalog/cas"
@@ -16,10 +17,10 @@ func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run main.go <command> [options]")
 		fmt.Println("Commands:")
-		fmt.Println("  auth-server    - Start the CAS authentication server")
-		fmt.Println("  api-server     - Start the main API server (with DB)")
-		fmt.Println("  test-cas       - Test CAS authentication")
-		fmt.Println("  test-simple    - Test endpoints without auth")
+		fmt.Println("auth-server    - Start the CAS authentication server")
+		fmt.Println("api-server     - Start the main API server (with DB)")
+		fmt.Println("test-cas       - Test CAS authentication")
+		fmt.Println("test-simple    - Test endpoints without auth")
 		os.Exit(1)
 	}
 
@@ -32,9 +33,9 @@ func main() {
 	case "api-server":
 		startAPIServer()
 	case "test-cas":
-		cas_test.RunCASTest()
+		//cas_test.RunCASTest()
 	case "test-simple":
-		runSimpleTest()
+		//runSimpleTest()
 	default:
 		log.Fatalf("Unknown command: %s", command)
 	}
@@ -49,6 +50,7 @@ func startAuthServer() {
 }
 
 func startAPIServer() {
+	//using command flags for some config
 	var port = flag.String("port", "8081", "Port for API server")
 	var dbURL = flag.String("db", "localhost:5432", "Database URL")
 	flag.Parse()
@@ -57,6 +59,7 @@ func startAPIServer() {
 	//runAPIServer(*port, *dbURL)
 }
 
+/*
 func runSimpleTest() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run main.go test-simple <endpoint>")
@@ -66,7 +69,7 @@ func runSimpleTest() {
 	endpoint := os.Args[1]
 	fmt.Printf("Testing endpoint: %s\n", endpoint)
 
-	// Prompt for credentials
+	//this doesn't work but you prompt for credentials
 	reader := bufio.NewReader(os.Stdin)
 	fmt.Print("Enter CWRU username: ")
 	username, err := reader.ReadString('\n')
@@ -82,9 +85,10 @@ func runSimpleTest() {
 	}
 	password := strings.TrimSpace(string(passwordBytes))
 
-	// Instantiate CASClient and test endpoint
+	//instantiate CASClient and test endpoint
 	client := cas_test.NewCASClient(username, password)
 	if err := client.TestEndPoint(endpoint); err != nil {
 		log.Fatalf("Error testing endpoint: %v", err)
 	}
 }
+*/
