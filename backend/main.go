@@ -10,6 +10,7 @@ import (
 	//"strings"
 
 	//"./cas"
+	api "github.com/bxb454/csds-395-lgbt-library-catalog/api"
 	cas_test "github.com/bxb454/csds-395-lgbt-library-catalog/cas"
 )
 
@@ -50,13 +51,19 @@ func startAuthServer() {
 }
 
 func startAPIServer() {
-	//using command flags for some config
 	var port = flag.String("port", "8081", "Port for API server")
-	var dbURL = flag.String("db", "localhost:5432", "Database URL")
 	flag.Parse()
 
-	fmt.Printf("Starting API server on port %s, connecting to DB at %s...\n", *port, *dbURL)
-	//runAPIServer(*port, *dbURL)
+	srv, err := api.New()
+	if err != nil {
+		log.Fatalf("failed to start API server: %v", err)
+	}
+
+	addr := ":" + *port
+	fmt.Printf("Starting the API server on %s...\n", addr)
+	if err := srv.Serve(addr); err != nil {
+		log.Fatalf("API server exited: %v", err)
+	}
 }
 
 /*
