@@ -3,12 +3,43 @@ import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 import BookDataTable from "./assets/BookDataTable.tsx";
+import LoginButton from "./assets/LoginButton.tsx";
+import LoginModal from "./assets/LoginModal.tsx";
 
 function App() {
   const [count, setCount] = useState(0)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [showLoginModal, setShowLoginModal] = useState(false)
+
+  const handleSignInClick = () => {
+    setShowLoginModal(true)
+  }
+
+  const handleSignIn = () => {
+    setIsLoggedIn(true)
+    setShowLoginModal(false)
+  }
+
+  const handleSignOut = () => {
+    setIsLoggedIn(false)
+  }
+
+  const handleCloseModal = () => {
+    setShowLoginModal(false)
+  }
 
   return (
     <>
+      <LoginButton 
+        isLoggedIn={isLoggedIn}
+        onSignIn={handleSignInClick}
+        onSignOut={handleSignOut}
+      />
+      <LoginModal 
+        isOpen={showLoginModal}
+        onClose={handleCloseModal}
+        onSignIn={handleSignIn}
+      />
       <div>
         <a href="https://vite.dev" target="_blank">
           <img src={viteLogo} className="logo" alt="Vite logo" />
