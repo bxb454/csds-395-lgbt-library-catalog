@@ -42,13 +42,16 @@
 }
 
 .login-button {
-  position: fixed;
   top: 1rem;
   right: 1rem;
   padding: 0.5rem 1rem;
-  background-color: blue;
+  background-color: black;
   color: white;
   z-index: 1000;
+  width: 110px;
+   &:hover {
+    background-color: gray; 
+  }
 }
 
 .modal-overlay {
@@ -85,9 +88,28 @@
 
 .signin-button {
   padding: 0.5rem 1rem;
-  background-color: blue;
+  background-color: black;
   color: white;
   margin: 0.25rem;
   display: block;
   width: 100%;
+}
+
+.app-header {
+  width: 100vw;
+  margin-left: calc(-50vw + 50%);  
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background-color: lightblue;
+  color: white;
+  padding: 1rem 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+}
+
+.app-title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
 }

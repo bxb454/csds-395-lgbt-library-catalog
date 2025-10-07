@@ -8,7 +8,7 @@ interface LoginButtonProps {
 
 const LoginButton: React.FC<LoginButtonProps> = ({ isLoggedIn, onSignIn, onSignOut }) => {
   return (
-    <button 
+    <button
       onClick={isLoggedIn ? onSignOut : onSignIn}
       className="login-button"
     >

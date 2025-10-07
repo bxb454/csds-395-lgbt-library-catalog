@@ -15,7 +15,7 @@ function App() {
   const [showLoginModal, setShowLoginModal] = useState(false)
   const [currentUser, setCurrentUser] = useState<UserData | null>(null)
 
-  
+
 
   const handleSignInClick = () => {
     setShowLoginModal(true)
@@ -37,17 +37,23 @@ function App() {
   }
 
   return (
+
     <>
-      <LoginButton 
-        isLoggedIn={isLoggedIn}
-        onSignIn={handleSignInClick}
-        onSignOut={handleSignOut}
-      />
-      <LoginModal 
+      <header className="app-header">
+        <h1 className="app-title">LGBT Center Library Catalog</h1>
+        <LoginButton
+          isLoggedIn={isLoggedIn}
+          onSignIn={handleSignInClick}
+          onSignOut={handleSignOut}
+        />
+      </header>
+
+      <LoginModal
         isOpen={showLoginModal}
         onClose={handleCloseModal}
         onSignIn={handleSignIn}
       />
+
 
       {/* Replace the above <LoginButton /> and <LoginModal /> w/
       
@@ -58,23 +64,23 @@ function App() {
       const CAS_LOGOUT = 'https://login.case.edu/cas/logout'
 
     */}
-  
+
       {currentUser && (
         <div style={{ margin: '1rem 0', padding: '1rem', backgroundColor: '#f0f0f0', borderRadius: '4px' }}>
           <strong>Logged in as:</strong> {currentUser.caseID} ({currentUser.role})
         </div>
       )}
 
-    
+
       <h2>Catalog</h2>
       <p>Browse available books (public access)</p>
       <BookDataTable></BookDataTable>
 
       {hasEmployeeAuth(currentUser) && (
         <>
-      <h2> Editable Catalog (employee only)</h2>
-      Checkouts? add, and delete function here
-      <BookDataTable editable={true}></BookDataTable>
+          <h2> Editable Catalog (employee only)</h2>
+          Checkouts? add, and delete function here
+          <BookDataTable editable={true}></BookDataTable>
         </>
       )}
 
@@ -85,7 +91,7 @@ function App() {
           <AdminUserTable></AdminUserTable>
         </>
       )}
-     
+
 
     </>
   )
