@@ -5,6 +5,7 @@ import './App.css'
 import BookDataTable from "./assets/BookDataTable.tsx";
 import LoginButton from "./assets/LoginButton.tsx";
 import LoginModal from "./assets/LoginModal.tsx";
+import AdminUserTable from "./assets/AdminUserTable.tsx";
 
 function App() {
   const [count, setCount] = useState(0)
@@ -60,8 +61,16 @@ function App() {
       <p className="read-the-docs">
         Click on the Vite and React logos to learn more
       </p>
-
+        <h2> Catalog</h2>
         <BookDataTable></BookDataTable>
+
+        <h2> Editable Catalog (employee only)</h2>
+        Checkouts? add, and delete function here
+        <BookDataTable editable={true}></BookDataTable>
+
+        <h2> Users (admin view only)</h2>
+        <AdminUserTable></AdminUserTable>
+
     </>
   )
 }
