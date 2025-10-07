@@ -9,7 +9,7 @@
 
 **II. set the environment variable CATALOG_DB_DSN to ensure that the MySQL driver for golang can find the correct DSN (Data Source Name) for the MySQL DB.**
 
-note, this is specific for windows. you'd use export command on a Linux/Unix based (MacOS) system.
+note, this is specific for windows. you'd use export command on a Linux/Unix based (MacOS) system. also, port 3306 is usually the default port for MySQL.
 
 
 ```
@@ -22,7 +22,9 @@ username and password are your username and password (local), respectively.
 
 **III. assuming you're in the main directory, run this in the terminal:**
 
-'go run ./backend/main.go api-server --port=8081'
+```
+go run ./backend/main.go api-server --port=8081
+```
 
 
 note:
