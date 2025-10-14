@@ -9,10 +9,6 @@ interface props {
     editable?: boolean;
 }
 
-function handleAddRow() {
-
-}
-
 const BookDataTable = (
         {editable = false}: props
     ) => {
@@ -51,7 +47,7 @@ const BookDataTable = (
                 },
                 {
                     accessorKey: 'available',
-                    header: 'available',
+                    header: 'available copies',
                     size: 50,
                 }
 
@@ -74,18 +70,29 @@ const BookDataTable = (
 //TODO impleemnt back end wiritng and datatpye validation
 
             if ( isNaN(Number(values.copies)) ) {
-                alert('Initmod must be a number');
+                alert('Copies must be a number');
+                return;
+            }
+            if ( isNaN(Number(values.available)) ) {
+                alert('Available copies must be a number');
+                return;
+            }
+            if (values.available > values.copies) {
+                alert('Cannot have more available copies than existing copies!');
                 return;
             }
 
-            //if role is not in roles, error
-            const newData = data.map(character =>
-                character.id === row.original.id ? {...character, ...values} : character
+            const newData = data.map(book =>
+                book.id === row.original.id ? {...book, ...values} : book
             );
 
             setData(newData);
 
             table.setEditingRow(null);//exit out of editing
+        }
+
+        const handleAddRow =({}: { row: any; values: BookData }) => {
+            //todo: move code here
         }
 
         const table = useMaterialReactTable({
@@ -121,13 +128,32 @@ const BookDataTable = (
 
             createDisplayMode: "modal",
             positionCreatingRow: "top",
-            onCreatingRowSave: handleAddRow,
+           //onCreatingRowSave: handleAddRow,
+            onCreatingRowSave: ({table, values}) => {
+                // Generate a new ID (simple increment for demo - use UUID in production)
+                //const isValid = !isNaN(values.turns ) && values.turns  >= 1 && Number.isInteger(values.turns );
 
+                const newBook: BookData = {
+                    ...values,
+                    //defaults if not there? todo conect to back
+                    id: values.id || data.length ? data[data.length - 1].id + 1 : 1,
+                    title: values.title || "Placeholder Title",
+                    copies: values.copies || 1,
+                    available: values.available || 1,
+                    //...values
 
-//            muiRowDragHandleProps: ({table}) => ({
+                };//TODO data validation
 
-            // 2. Then add row styling that won't interfere with dragging
-            // muiTableBodyRowProps: ({row}) => ({}),
+                const newData = [...data, newBook];
+                setData(newData);
+                console.log("new book added")
+                table.setCreatingRow(null);
+
+            },
+            onCreatingRowCancel: () => {
+                //clear any validation errors
+            },
+
         });
 
         return (

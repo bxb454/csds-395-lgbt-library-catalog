@@ -37,8 +37,8 @@ const AdminUserTable = () => {
             console.log('in handleSaveRow', row, values);
 //TODO impleemnt back end wiritng and datatpye validation
             //if role is not in roles, error
-            const newData = data.map(character =>
-                character.id === row.original.id ? {...character, ...values} : character
+            const newData = data.map(user =>
+                user.id === row.original.id ? {...user, ...values} : user
             );
 
             setData(newData);
