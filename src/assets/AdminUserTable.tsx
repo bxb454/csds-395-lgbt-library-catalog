@@ -15,11 +15,15 @@ const AdminUserTable = () => {
                 {
                     accessorKey: 'role',
                     header: 'role', //user, employee, admin
+                    editVariant: 'select',
+                    editSelectOptions: ['user', 'employee', 'admin'],
                     size: 50,
                 },
                 {
                     accessorKey: 'isRestricted',
                     header: 'overdues',
+                    editVariant: 'select',
+                    editSelectOptions: ["false", "true"],//TODO turn into checkbox
                     size: 50,
                 }
 
@@ -27,15 +31,28 @@ const AdminUserTable = () => {
             [],
         );
 
-       const [data, setData] = useState<UserData[]>(fakeUserData1);
+        const [data, setData] = useState<UserData[]>(fakeUserData1);
+
+        const handleSaveRow = ({row, values}: { row: any; values: UserData }) => {
+            console.log('in handleSaveRow', row, values);
+//TODO impleemnt back end wiritng and datatpye validation
+            //if role is not in roles, error
+            const newData = data.map(character =>
+                character.id === row.original.id ? {...character, ...values} : character
+            );
+
+            setData(newData);
+
+            table.setEditingRow(null);//exit out of editing
+        }
 
         const table = useMaterialReactTable({
             columns,
             enableEditing: true,
 
+            onEditingRowSave: handleSaveRow,
 
-
-            editDisplayMode:"modal",
+            editDisplayMode: "modal",
             data,
         });
 

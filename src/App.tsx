@@ -76,10 +76,18 @@ function App() {
       <p>Browse available books (public access)</p>
       <BookDataTable></BookDataTable>
 
+        {isLoggedIn && (
+            <>
+                <h2> Your Checkouts</h2>
+                <BookDataTable></BookDataTable>
+            </>
+
+        )}
+
       {hasEmployeeAuth(currentUser) && (
         <>
           <h2> Editable Catalog (employee only)</h2>
-          Checkouts? add, and delete function here
+          Update database here.
           <BookDataTable editable={true}></BookDataTable>
         </>
       )}

@@ -5,6 +5,8 @@ export interface BookData {
     genre?: string;
     image?: string;
     tags?: string[];
+    copies: number;
+    available: number;
 }
 
 export class UserData {

@@ -8,6 +8,8 @@ export const fakeBookData1: BookData[] = [
         author: 'john gay',
         genre: 'romance',
         //tags: [''],
+        copies: 1,
+        available: 1,
     },
     {
         id: 2,
@@ -15,6 +17,8 @@ export const fakeBookData1: BookData[] = [
         author: 'jane gender',
         genre: 'thriller',
         tags: ['blue'],
+        copies: 1,
+        available: 1,
     },
     {
         id: 3,
@@ -22,7 +26,9 @@ export const fakeBookData1: BookData[] = [
         author: 'john gay',
         genre: 'romance',
         tags: ['blue', 'danube'],
-        image: 'fake_data/testbook1.png'
+        image: 'fake_data/testbook1.png',
+        copies: 36,
+        available: 9,
     }
 ]
 export const fakeUserData1: UserData[] = [

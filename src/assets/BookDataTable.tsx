@@ -1,23 +1,15 @@
 import {MaterialReactTable, type MRT_ColumnDef, type MRT_Row, useMaterialReactTable,} from "material-react-table";
 import {useMemo, useState} from "react";
-import {Button, IconButton, Box, } from "@mui/material";
-import { Delete, Edit } from '@mui/icons-material';
-import type {BookData} from "./Types.ts";
+import {Button, IconButton, Box,} from "@mui/material";
+import {Delete, Edit} from '@mui/icons-material';
+import type {BookData, UserData} from "./Types.ts";
 import {fakeBookData1} from "./fake_data.tsx"
 
 interface props {
     editable?: boolean;
 }
 
-function handleUpdateRow() {
-
-}
-
 function handleAddRow() {
-
-}
-
-function handleDeleteRow(row: MRT_Row<BookData>) {
 
 }
 
@@ -69,12 +61,39 @@ const BookDataTable = (
 
         const [data, setData] = useState<BookData[]>(fakeBookData1);
 
+        const handleDeleteRow = (row: any) => {
+            if (window.confirm('Are you sure you want to delete this row?')) {
+                const newData = data.filter(character => character.id !== row.original.id);
+                setData(newData);
+                //onChange?.(newData); // Notify parent of changes
+                //deletesound.play();
+            }
+        };
+        const handleSaveRow = ({row, values}: { row: any; values: BookData }) => {
+            console.log('in handleSaveRow', row, values);
+//TODO impleemnt back end wiritng and datatpye validation
+
+            if ( isNaN(Number(values.copies)) ) {
+                alert('Initmod must be a number');
+                return;
+            }
+
+            //if role is not in roles, error
+            const newData = data.map(character =>
+                character.id === row.original.id ? {...character, ...values} : character
+            );
+
+            setData(newData);
+
+            table.setEditingRow(null);//exit out of editing
+        }
+
         const table = useMaterialReactTable({
             columns, data,
             // null,
             enableEditing: editable,
             renderTopToolbarCustomActions: editable
-                ? ({ table }) => (
+                ? ({table}) => (
                     <Button
                         onClick={() => table.setCreatingRow(true)}
                         variant="contained"
@@ -84,21 +103,21 @@ const BookDataTable = (
                     </Button>
                 )
                 : undefined,
-            renderRowActions: ({ row, table }) => (
-                <Box sx={{ display: 'flex', gap: '1rem' }}>
+            renderRowActions: ({row, table}) => (
+                <Box sx={{display: 'flex', gap: '1rem'}}>
                     <IconButton color="error" onClick={() => handleDeleteRow(row)}>
-                        <Delete />
+                        <Delete/>
                     </IconButton>
                     {editable && (
                         <IconButton onClick={() => table.setEditingRow(row)}>
-                            <Edit />
+                            <Edit/>
                         </IconButton>
                     )}
                 </Box>
             ),
 
             editDisplayMode: "modal",
-            onEditingRowSave: handleUpdateRow,
+            onEditingRowSave: handleSaveRow,
 
             createDisplayMode: "modal",
             positionCreatingRow: "top",
