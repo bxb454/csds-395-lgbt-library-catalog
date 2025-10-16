@@ -50,10 +50,8 @@ func New() (*Server, error) {
 	v1.Handle("/books", s.wrapLimiter(s.handleBooks()))
 	//note: the trailing slash is important here to match /books/{id}
 	v1.Handle("/books/", s.wrapLimiter(s.handleBookByID()))
-	/*
-	   v1.Handle("/authors", s.wrapLimiter(s.handleAuthors()))
-	   v1.Handle("/loans", s.wrapLimiter(s.handleLoans()))
-	*/
+	v1.Handle("/authors", s.wrapLimiter(s.handleAuthors()))
+	v1.Handle("/loans", s.wrapLimiter(s.handleLoans()))
 
 	s.router.Handle("/api/v1/", http.StripPrefix("/api/v1", v1))
 	s.router.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -207,6 +205,142 @@ func (s *Server) handleBookByID() http.Handler {
 				return
 			}
 			w.WriteHeader(http.StatusNoContent)
+
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+}
+
+func (s *Server) handleAuthors() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			rows, error := s.db.QueryContext(r.Context(), `
+			SELECT authID, lname, fname FROM authors`, )
+			if error != nil {
+				http.Error(w, "query failed", http.StatusInternalServerError)
+				return
+			}
+			defer rows.Close()
+
+			type authors struct {
+				AuthID int `json:"authID"`
+				LName *string `json:"lname"`
+				FName *string `json:"fname"`
+			}
+
+			var result []authors
+
+			for rows.Next() {
+				var a authors
+				if error := rows.Scan(
+					&a.AuthID, &a.LName, &a.FName,
+				); error != nil {
+					http.Error(w, "Scan failed", http.StatusInternalServerError)
+					return
+				}
+				result = append(result, a)
+			}
+			writeJSON(w, http.StatusOK, result)
+
+		case http.MethodPost:
+			type payload struct {
+				AuthID int `json:"authID"`
+				LName *string `json:"lname"`
+				FName *string `json:"fname"`
+			}
+			var body payload
+			if err := decodeJSON(r, &body); err != nil {
+				http.Error(w, "invalid json", http.StatusBadRequest)
+				return
+			}
+			if body.AuthID == 0 || *body.LName == "" || *body.FName == "" {
+				http.Error(w, "missing required fields", http.StatusBadRequest)
+				return
+			}
+
+			res, err := s.db.ExecContext(r.Context(), `
+                INSERT INTO loan (authID, lname, fname)
+                VALUES (?, ?, 0)`,
+				body.AuthID, body.LName, body.FName,
+			)
+			if err != nil {
+				http.Error(w, "insert failed", http.StatusInternalServerError)
+				return
+			}
+			id, _ := res.LastInsertId()
+			writeJSON(w, http.StatusCreated, map[string]any{"id": id})
+
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+}
+
+func (s *Server) handleLoans() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			rows, error := s.db.QueryContext(r.Context(), `
+			SELECT bookID, caseID, loanDate, dueDate, numRenewals FROM loan`, )
+			if error != nil {
+				http.Error(w, "query failed", http.StatusInternalServerError)
+				return
+			}
+			defer rows.Close()
+
+			type loan struct {
+				BookID int `json:"bookID"`
+				CaseID *string `json:"caseID"`
+				LoanDate time.Time `json:"loanDate"`
+				DueDate time.Time `json:"dueDate"`
+				NumRenewals int `json:"numRenewals"`
+			}
+
+			var result []loan
+
+			for rows.Next() {
+				var l loan
+				if error := rows.Scan(
+					&l.BookID, &l.CaseID, &l.LoanDate, &l.DueDate, &l.NumRenewals,
+				); error != nil {
+					http.Error(w, "Scan failed", http.StatusInternalServerError)
+					return
+				}
+				result = append(result, l)
+			}
+			writeJSON(w, http.StatusOK, result)
+
+		case http.MethodPost:
+			type payload struct {
+				BookID int `json:"bookID"`
+				CaseID *string `json:"caseID"`
+				LoanDate time.Time `json:"loanDate"`
+				DueDate time.Time `json:"dueDate"`
+				NumRenewals int `json:"numRenewals"`
+			}
+			var body payload
+			if err := decodeJSON(r, &body); err != nil {
+				http.Error(w, "invalid json", http.StatusBadRequest)
+				return
+			}
+			if body.BookID <= 0 || *body.CaseID == "" || body.NumRenewals < 0 {
+				http.Error(w, "missing required fields", http.StatusBadRequest)
+				return
+			}
+
+			res, err := s.db.ExecContext(r.Context(), `
+                INSERT INTO loan (bookID, caseID, loanDate, dueDate, numRenewals)
+                VALUES (?, ?, ?, ?, 0)`,
+				body.BookID, body.CaseID, body.LoanDate, body.DueDate, body.NumRenewals,
+			)
+			if err != nil {
+				http.Error(w, "insert failed", http.StatusInternalServerError)
+				return
+			}
+			id, _ := res.LastInsertId()
+			writeJSON(w, http.StatusCreated, map[string]any{"id": id})
 
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

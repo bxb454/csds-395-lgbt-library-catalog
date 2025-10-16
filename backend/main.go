@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"log"
 	"os"
-
 	//"strings"
 
 	//"./cas"
-	api "github.com/bxb454/csds-395-lgbt-library-catalog/api"
-	cas_test "github.com/bxb454/csds-395-lgbt-library-catalog/cas"
+	api "github.com/bxb454/csds-395-lgbt-library-catalog/backend/api"
+	cas_test "github.com/bxb454/csds-395-lgbt-library-catalog/backend/cas"
 )
 
 func main() {
