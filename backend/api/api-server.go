@@ -46,6 +46,23 @@ type author struct {
 
 } */
 
+/*
+
+CREATE TABLE users(
+	caseID varchar(8) not null,
+    role enum('guest', 'patron', 'staff', 'admin') not null,
+    primary key(caseID),
+    isRestricted boolean not null
+);
+
+*/
+
+type user struct {
+	CaseID       string `json:"caseID"`
+	Role         string `json:"role"`
+	IsRestricted bool   `json:"isRestricted"`
+}
+
 type PaginationParams struct {
 	Limit  int
 	Offset int
@@ -144,14 +161,17 @@ func New() (*Server, error) {
 	}
 
 	v1 := http.NewServeMux()
+	//boris endpoints
 	v1.Handle("/books", s.wrapLimiter(s.handleBooks()))
 	//note: the trailing slash is important here to match /books/{id}
 	v1.Handle("/books/", s.wrapLimiter(s.handleBookByID()))
 	v1.Handle("/search", s.wrapLimiter(s.handleSearch()))
-	/*
-	   v1.Handle("/authors", s.wrapLimiter(s.handleAuthors()))
-	   v1.Handle("/loans", s.wrapLimiter(s.handleLoans()))
-	*/
+	v1.Handle("/users", s.wrapLimiter(s.handleUsers()))
+	//same here
+	v1.Handle("/users/", s.wrapLimiter(s.handleUsers()))
+	//endpoints made by dan:
+	v1.Handle("/authors", s.wrapLimiter(s.handleAuthors()))
+	v1.Handle("/loans", s.wrapLimiter(s.handleLoans()))
 
 	s.router.Handle("/api/v1/", http.StripPrefix("/api/v1", v1))
 	s.router.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -342,8 +362,139 @@ func (s *Server) handleBookByID() http.Handler {
 	})
 }
 
+func (s *Server) handleUsers() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Extract caseID from path if present
+		caseID := strings.TrimPrefix(r.URL.Path, "/users/")
+
+		// If there's a caseID, handle single user operations
+		if caseID != "" {
+			s.handleSingleUser(w, r, caseID)
+			return
+		}
+
+		// Otherwise, handle collection operations
+		switch r.Method {
+		case http.MethodGet:
+			// List all users (with pagination)
+			pagination := parsePagination(r)
+			rows, err := s.db.QueryContext(r.Context(), `
+                SELECT caseID, role, isRestricted FROM users
+                ORDER BY caseID LIMIT ? OFFSET ?`,
+				pagination.Limit, pagination.Offset,
+			)
+			if err != nil {
+				http.Error(w, "query failed", http.StatusInternalServerError)
+				return
+			}
+			defer rows.Close()
+
+			var users []user
+			for rows.Next() {
+				var u user
+				if err := rows.Scan(&u.CaseID, &u.Role, &u.IsRestricted); err != nil {
+					http.Error(w, "scan failed", http.StatusInternalServerError)
+					return
+				}
+				users = append(users, u)
+			}
+
+			var total int
+			s.db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM users`).Scan(&total)
+
+			response := map[string]interface{}{
+				"data": users,
+				"pagination": map[string]interface{}{
+					"limit":   pagination.Limit,
+					"offset":  pagination.Offset,
+					"total":   total,
+					"hasMore": pagination.Offset+pagination.Limit < total,
+				},
+			}
+			writeJSON(w, http.StatusOK, response)
+
+		case http.MethodPost:
+			var u user
+			if err := decodeJSON(r, &u); err != nil {
+				http.Error(w, "invalid json", http.StatusBadRequest)
+				return
+			}
+			if u.CaseID == "" || u.Role == "" {
+				http.Error(w, "missing required fields", http.StatusBadRequest)
+				return
+			}
+
+			_, err := s.db.ExecContext(r.Context(), `
+                INSERT INTO users (caseID, role, isRestricted)
+                VALUES (?, ?, ?)`,
+				u.CaseID, u.Role, u.IsRestricted,
+			)
+			if err != nil {
+				http.Error(w, "insert failed", http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusCreated, map[string]string{"caseID": u.CaseID})
+
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+}
+
+func (s *Server) handleSingleUser(w http.ResponseWriter, r *http.Request, caseID string) {
+	switch r.Method {
+	case http.MethodGet:
+		var u user
+		err := s.db.QueryRowContext(r.Context(), `
+            SELECT caseID, role, isRestricted FROM users WHERE caseID = ?`,
+			caseID,
+		).Scan(&u.CaseID, &u.Role, &u.IsRestricted)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		if err != nil {
+			http.Error(w, "query failed", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, u)
+
+	case http.MethodPatch:
+		var updates user
+		if err := decodeJSON(r, &updates); err != nil {
+			http.Error(w, "invalid json", http.StatusBadRequest)
+			return
+		}
+		_, err := s.db.ExecContext(r.Context(), `
+            UPDATE users SET role = ?, isRestricted = ? WHERE caseID = ?`,
+			updates.Role, updates.IsRestricted, caseID,
+		)
+		if err != nil {
+			http.Error(w, "update failed", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	case http.MethodDelete:
+		res, err := s.db.ExecContext(r.Context(), `DELETE FROM users WHERE caseID = ?`, caseID)
+		if err != nil {
+			http.Error(w, "delete failed", http.StatusInternalServerError)
+			return
+		}
+		if rows, _ := res.RowsAffected(); rows == 0 {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 // handle search across books, authors, tags
 // note: we should get authors and tags endpoints working. this works without them but we need them
+// EXAMPLE: GET/api/v1/search?q=Stone&limit=5&offset=10
 func (s *Server) handleSearch() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		query := r.URL.Query().Get("q")
@@ -417,6 +568,144 @@ func (s *Server) handleSearch() http.Handler {
 		}
 
 		writeJSON(w, http.StatusOK, response)
+	})
+}
+
+// dan wrote this
+func (s *Server) handleAuthors() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			rows, error := s.db.QueryContext(r.Context(), `
+			SELECT authID, lname, fname FROM authors`)
+			if error != nil {
+				http.Error(w, "query failed", http.StatusInternalServerError)
+				return
+			}
+			defer rows.Close()
+
+			type authors struct {
+				AuthID int     `json:"authID"`
+				LName  *string `json:"lname"`
+				FName  *string `json:"fname"`
+			}
+
+			var result []authors
+
+			for rows.Next() {
+				var a authors
+				if error := rows.Scan(
+					&a.AuthID, &a.LName, &a.FName,
+				); error != nil {
+					http.Error(w, "Scan failed", http.StatusInternalServerError)
+					return
+				}
+				result = append(result, a)
+			}
+			writeJSON(w, http.StatusOK, result)
+
+		case http.MethodPost:
+			type payload struct {
+				AuthID int     `json:"authID"`
+				LName  *string `json:"lname"`
+				FName  *string `json:"fname"`
+			}
+			var body payload
+			if err := decodeJSON(r, &body); err != nil {
+				http.Error(w, "invalid json", http.StatusBadRequest)
+				return
+			}
+			if body.AuthID == 0 || *body.LName == "" || *body.FName == "" {
+				http.Error(w, "missing required fields", http.StatusBadRequest)
+				return
+			}
+
+			res, err := s.db.ExecContext(r.Context(), `
+                INSERT INTO loan (authID, lname, fname)
+                VALUES (?, ?, 0)`,
+				body.AuthID, body.LName, body.FName,
+			)
+			if err != nil {
+				http.Error(w, "insert failed", http.StatusInternalServerError)
+				return
+			}
+			id, _ := res.LastInsertId()
+			writeJSON(w, http.StatusCreated, map[string]any{"id": id})
+
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+}
+
+// dan also wrote this
+func (s *Server) handleLoans() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet:
+			rows, error := s.db.QueryContext(r.Context(), `
+			SELECT bookID, caseID, loanDate, dueDate, numRenewals FROM loan`)
+			if error != nil {
+				http.Error(w, "query failed", http.StatusInternalServerError)
+				return
+			}
+			defer rows.Close()
+
+			type loan struct {
+				BookID      int       `json:"bookID"`
+				CaseID      *string   `json:"caseID"`
+				LoanDate    time.Time `json:"loanDate"`
+				DueDate     time.Time `json:"dueDate"`
+				NumRenewals int       `json:"numRenewals"`
+			}
+
+			var result []loan
+
+			for rows.Next() {
+				var l loan
+				if error := rows.Scan(
+					&l.BookID, &l.CaseID, &l.LoanDate, &l.DueDate, &l.NumRenewals,
+				); error != nil {
+					http.Error(w, "Scan failed", http.StatusInternalServerError)
+					return
+				}
+				result = append(result, l)
+			}
+			writeJSON(w, http.StatusOK, result)
+
+		case http.MethodPost:
+			type payload struct {
+				BookID      int       `json:"bookID"`
+				CaseID      *string   `json:"caseID"`
+				LoanDate    time.Time `json:"loanDate"`
+				DueDate     time.Time `json:"dueDate"`
+				NumRenewals int       `json:"numRenewals"`
+			}
+			var body payload
+			if err := decodeJSON(r, &body); err != nil {
+				http.Error(w, "invalid json", http.StatusBadRequest)
+				return
+			}
+			if body.BookID <= 0 || *body.CaseID == "" || body.NumRenewals < 0 {
+				http.Error(w, "missing required fields", http.StatusBadRequest)
+				return
+			}
+
+			res, err := s.db.ExecContext(r.Context(), `
+                INSERT INTO loan (bookID, caseID, loanDate, dueDate, numRenewals)
+                VALUES (?, ?, ?, ?, 0)`,
+				body.BookID, body.CaseID, body.LoanDate, body.DueDate, body.NumRenewals,
+			)
+			if err != nil {
+				http.Error(w, "insert failed", http.StatusInternalServerError)
+				return
+			}
+			id, _ := res.LastInsertId()
+			writeJSON(w, http.StatusCreated, map[string]any{"id": id})
+
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
 	})
 }
 
