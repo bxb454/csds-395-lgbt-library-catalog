@@ -88,3 +88,22 @@ fetch("http://localhost:8081/api/v1/books/1001", { method: "DELETE" })
 
 
 i recommend you use axios instead to make your life easier.
+
+### **IV. Notes**
+
+- **Pagination and Filtering:**  
+  The `/books` endpoint supports pagination and filtering. for example (axios):
+  ```javascript
+  axios.get("http://localhost:8081/api/v1/books", {
+    params: {
+      limit: 10,
+      offset: 0,
+      title: "Stone",
+      publisher: "Firebrand"
+    }
+  }).then(response => console.log(response.data))
+    .catch(error => console.error(error));
+  ```
+
+- **Rate Limiting:**  
+  The API enforces rate limiting per IP. If you exceed the limit, you'll receive a `429 Too Many Requests` error.
