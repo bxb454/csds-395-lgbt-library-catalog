@@ -107,7 +107,7 @@ func (s *Server) handleBooks() http.Handler {
 				var b book
 				if err := rows.Scan(
 					&b.ID, &b.ISBN, &b.Title, &b.PubDate,
-					&b.Publisher, &b.Edition, &b.Copies, &b.LoanMetrics,
+					&b.Publisher, &b.Edition, &b.Copies, &b.Thumbnail, &b.LoanMetrics,
 				); err != nil {
 					http.Error(w, "scan failed", http.StatusInternalServerError)
 					return
@@ -131,10 +131,13 @@ func (s *Server) handleBooks() http.Handler {
 				http.Error(w, "invalid json", http.StatusBadRequest)
 				return
 			}
+			//we can't have a book without a title or copies (aka the book doesn't exist)
 			if body.Title == "" || body.Copies <= 0 {
 				http.Error(w, "missing required fields", http.StatusBadRequest)
 				return
 			}
+
+			//loan metrics will be added by 1 every time it's checked out
 
 			res, err := s.db.ExecContext(r.Context(), `
                 INSERT INTO books (isbn, title, pubdate, publisher, edition, copies, thumbnail, loanMetrics)
@@ -154,6 +157,7 @@ func (s *Server) handleBooks() http.Handler {
 	})
 }
 
+// query by ID
 func (s *Server) handleBookByID() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := strings.TrimPrefix(r.URL.Path, "/books/")
