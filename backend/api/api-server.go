@@ -352,13 +352,36 @@ func (s *Server) handleSearch() http.Handler {
 			return
 		}
 
+		pagination := parsePagination(r)
+
+		//get total count of results
+		//this might be awful for performance but it works for now
+		var total int
+		err := s.db.QueryRowContext(r.Context(), `
+            SELECT COUNT(*) FROM (
+                SELECT bookID FROM books WHERE title LIKE ?
+                UNION
+                SELECT authID FROM authors WHERE fname LIKE ? OR lname LIKE ?
+                UNION
+                SELECT NULL FROM booktags WHERE tag LIKE ?
+            ) AS totalResults`,
+			"%"+query+"%", "%"+query+"%", "%"+query+"%", "%"+query+"%",
+		).Scan(&total)
+		if err != nil {
+			http.Error(w, "failed to count search results", http.StatusInternalServerError)
+			return
+		}
+
+		//get paginated results
 		rows, err := s.db.QueryContext(r.Context(), `
             SELECT 'book' AS type, bookID AS id, title AS name FROM books WHERE title LIKE ?
             UNION
             SELECT 'author', authID, CONCAT(fname, ' ', lname) FROM authors WHERE fname LIKE ? OR lname LIKE ?
             UNION
-            SELECT 'tag', NULL, tag FROM booktags WHERE tag LIKE ?`,
+            SELECT 'tag', NULL, tag FROM booktags WHERE tag LIKE ?
+            LIMIT ? OFFSET ?`,
 			"%"+query+"%", "%"+query+"%", "%"+query+"%", "%"+query+"%",
+			pagination.Limit, pagination.Offset,
 		)
 		if err != nil {
 			http.Error(w, "search query failed", http.StatusInternalServerError)
@@ -381,7 +404,19 @@ func (s *Server) handleSearch() http.Handler {
 				"name": name,
 			})
 		}
-		writeJSON(w, http.StatusOK, results)
+
+		//build the response with the metadata for pagination
+		response := map[string]interface{}{
+			"data": results,
+			"pagination": map[string]interface{}{
+				"limit":   pagination.Limit,
+				"offset":  pagination.Offset,
+				"total":   total,
+				"hasMore": pagination.Offset+pagination.Limit < total,
+			},
+		}
+
+		writeJSON(w, http.StatusOK, response)
 	})
 }
 
