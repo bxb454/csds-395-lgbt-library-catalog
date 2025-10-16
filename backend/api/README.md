@@ -105,5 +105,16 @@ i recommend you use axios instead to make your life easier.
     .catch(error => console.error(error));
   ```
 
+  **Search Endpoint:**
+  ```javascript
+  axios.get("http://localhost:8081/api/v1/search", {
+  params: {
+    q: "Stone",
+    limit: 5,
+    offset: 0
+  }
+}).then(response => console.log(response.data))
+  .catch(error => console.error(error));
+
 - **Rate Limiting:**  
   The API enforces rate limiting per IP. If you exceed the limit, you'll receive a `429 Too Many Requests` error.
