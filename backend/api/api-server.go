@@ -2,6 +2,7 @@ package api
 
 import (
 	//"context"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +19,44 @@ import (
 	"golang.org/x/time/rate"
 )
 
+//note a lot of this code is rly repetitive and could be abstracted better instead of just
+//having switch statements everywhere and writing the same boilerplate but save that for past the demo
+
+// --- structs to define data types/models ---
+
+type book struct {
+	ID          int     `json:"id"`
+	ISBN        *string `json:"isbn"`
+	Title       string  `json:"title"`
+	PubDate     *string `json:"pubdate"`
+	Publisher   *string `json:"publisher"`
+	Edition     *string `json:"edition"`
+	Copies      int     `json:"copies"`
+	Thumbnail   []byte  `json:"thumbnail"`
+	LoanMetrics int     `json:"loanMetrics"`
+}
+
+/*
+type author struct {
+
+}
+*/
+
+/* type loan struct {
+
+} */
+
+type PaginationParams struct {
+	Limit  int
+	Offset int
+}
+
+type BookFilters struct {
+	Title     string
+	ISBN      string
+	Publisher string
+}
+
 type Server struct {
 	db           *sql.DB
 	router       *http.ServeMux
@@ -24,6 +64,61 @@ type Server struct {
 	limitMu      sync.Mutex
 	rateInterval time.Duration
 	rateBurst    int
+}
+
+// --- end structs ---
+
+func parseBookFilters(r *http.Request) BookFilters {
+	return BookFilters{
+		Title:     r.URL.Query().Get("title"),
+		ISBN:      r.URL.Query().Get("isbn"),
+		Publisher: r.URL.Query().Get("publisher"),
+	}
+}
+
+// simple pagination parser with defaults.
+func parsePagination(r *http.Request) PaginationParams {
+	params := PaginationParams{Limit: 10, Offset: 0}
+
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
+			params.Limit = parsed
+		}
+	}
+
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+			params.Offset = parsed
+		}
+	}
+
+	return params
+}
+
+func (bf BookFilters) buildWhereClause() (string, []interface{}) {
+	var conditions []string
+	var args []interface{}
+
+	if bf.Title != "" {
+		conditions = append(conditions, "title LIKE ?")
+		args = append(args, "%"+bf.Title+"%")
+	}
+	if bf.ISBN != "" {
+		conditions = append(conditions, "isbn = ?")
+		args = append(args, bf.ISBN)
+	}
+	if bf.Publisher != "" {
+		conditions = append(conditions, "publisher LIKE ?")
+		args = append(args, "%"+bf.Publisher+"%")
+	}
+
+	//join conditions with " AND " and prepend "WHERE" if there are any conditions
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	return whereClause, args
 }
 
 func New() (*Server, error) {
@@ -38,18 +133,21 @@ func New() (*Server, error) {
 		return nil, err
 	}
 
+	//10 requests per second, max 10 burst (at once)
+	//unsuitable for non-monolithic
 	s := &Server{
 		db:           db,
 		router:       http.NewServeMux(),
 		limiters:     make(map[string]*rate.Limiter),
-		rateInterval: 60 * time.Second,
-		rateBurst:    100,
+		rateInterval: 100 * time.Millisecond,
+		rateBurst:    10,
 	}
 
 	v1 := http.NewServeMux()
 	v1.Handle("/books", s.wrapLimiter(s.handleBooks()))
 	//note: the trailing slash is important here to match /books/{id}
 	v1.Handle("/books/", s.wrapLimiter(s.handleBookByID()))
+	v1.Handle("/search", s.wrapLimiter(s.handleSearch()))
 	/*
 	   v1.Handle("/authors", s.wrapLimiter(s.handleAuthors()))
 	   v1.Handle("/loans", s.wrapLimiter(s.handleLoans()))
@@ -68,6 +166,46 @@ func New() (*Server, error) {
 	return s, nil
 }
 
+func (s *Server) queryBooksWithFilters(ctx context.Context, filters BookFilters, pagination PaginationParams) ([]book, int, error) {
+	whereClause, args := filters.buildWhereClause()
+
+	//build main query, parse pagination params, and scan
+	query := `SELECT bookID, isbn, title, pubdate, publisher, edition, copies, thumbnail, loanMetrics FROM books` +
+		whereClause + ` ORDER BY bookID LIMIT ? OFFSET ?`
+	//we can use OFFSET keyword in SQL to skip a number of rows for offset pagination method
+	args = append(args, pagination.Limit, pagination.Offset)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var result []book
+	for rows.Next() {
+		var b book
+		if err := rows.Scan(
+			&b.ID, &b.ISBN, &b.Title, &b.PubDate,
+			&b.Publisher, &b.Edition, &b.Copies, &b.Thumbnail, &b.LoanMetrics,
+		); err != nil {
+			return nil, 0, err
+		}
+		result = append(result, b)
+	}
+
+	//get the total count of books
+	countQuery := `SELECT COUNT(*) FROM books` + whereClause
+	//countArgs, _ := filters.buildWhereClause()
+	var total int
+	//exclude the limit and offset args for the count query
+	err = s.db.QueryRowContext(ctx, countQuery, args[:len(args)-2]...).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return result, total, nil
+}
+
 func (s *Server) Serve(addr string) error {
 	defer s.db.Close()
 	log.Printf("API server listening on %s", addr)
@@ -80,42 +218,26 @@ func (s *Server) handleBooks() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			rows, err := s.db.QueryContext(r.Context(), `
-                SELECT bookID, isbn, title, pubdate, publisher, edition, copies, loanMetrics
-                FROM books`,
-			)
+			pagination := parsePagination(r)
+			filters := parseBookFilters(r)
+
+			books, total, err := s.queryBooksWithFilters(r.Context(), filters, pagination)
 			if err != nil {
 				http.Error(w, "query failed", http.StatusInternalServerError)
 				return
 			}
-			defer rows.Close()
 
-			type book struct {
-				ID          int     `json:"id"`
-				ISBN        *string `json:"isbn"`
-				Title       string  `json:"title"`
-				PubDate     *string `json:"pubdate"`
-				Publisher   *string `json:"publisher"`
-				Edition     *string `json:"edition"`
-				Copies      int     `json:"copies"`
-				Thumbnail   []byte  `json:"thumbnail"`
-				LoanMetrics int     `json:"loanMetrics"`
+			response := map[string]interface{}{
+				"data": books,
+				"pagination": map[string]interface{}{
+					"limit":   pagination.Limit,
+					"offset":  pagination.Offset,
+					"total":   total,
+					"hasMore": pagination.Offset+pagination.Limit < total,
+				},
 			}
 
-			var result []book
-			for rows.Next() {
-				var b book
-				if err := rows.Scan(
-					&b.ID, &b.ISBN, &b.Title, &b.PubDate,
-					&b.Publisher, &b.Edition, &b.Copies, &b.Thumbnail, &b.LoanMetrics,
-				); err != nil {
-					http.Error(w, "scan failed", http.StatusInternalServerError)
-					return
-				}
-				result = append(result, b)
-			}
-
-			writeJSON(w, http.StatusOK, result)
+			writeJSON(w, http.StatusOK, response)
 
 		case http.MethodPost:
 			type payload struct {
@@ -158,6 +280,7 @@ func (s *Server) handleBooks() http.Handler {
 }
 
 // query by ID
+// no need for pagination since it's just one item
 func (s *Server) handleBookByID() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := strings.TrimPrefix(r.URL.Path, "/books/")
@@ -186,6 +309,7 @@ func (s *Server) handleBookByID() http.Handler {
 				return
 			}
 			if err != nil {
+				log.Printf("query error: %v", err)
 				http.Error(w, "query failed", http.StatusInternalServerError)
 				return
 			}
@@ -217,6 +341,51 @@ func (s *Server) handleBookByID() http.Handler {
 		}
 	})
 }
+
+// handle search across books, authors, tags
+// note: we should get authors and tags endpoints working. this works without them but we need them
+func (s *Server) handleSearch() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("q")
+		if query == "" {
+			http.Error(w, "missing search query", http.StatusBadRequest)
+			return
+		}
+
+		rows, err := s.db.QueryContext(r.Context(), `
+            SELECT 'book' AS type, bookID AS id, title AS name FROM books WHERE title LIKE ?
+            UNION
+            SELECT 'author', authID, CONCAT(fname, ' ', lname) FROM authors WHERE fname LIKE ? OR lname LIKE ?
+            UNION
+            SELECT 'tag', NULL, tag FROM booktags WHERE tag LIKE ?`,
+			"%"+query+"%", "%"+query+"%", "%"+query+"%", "%"+query+"%",
+		)
+		if err != nil {
+			http.Error(w, "search query failed", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var results []map[string]interface{}
+		for rows.Next() {
+			var resultType string
+			var id sql.NullInt64
+			var name string
+			if err := rows.Scan(&resultType, &id, &name); err != nil {
+				http.Error(w, "scan failed", http.StatusInternalServerError)
+				return
+			}
+			results = append(results, map[string]interface{}{
+				"type": resultType,
+				"id":   id.Int64,
+				"name": name,
+			})
+		}
+		writeJSON(w, http.StatusOK, results)
+	})
+}
+
+//add the other functions for authors and loans....
 
 // --- helpers ---
 
