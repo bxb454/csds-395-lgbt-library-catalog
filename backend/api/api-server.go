@@ -87,6 +87,51 @@ type Server struct {
 	rateBurst    int
 }
 
+// simple pagination parser with defaults.
+func parsePagination(r *http.Request) PaginationParams {
+	params := PaginationParams{Limit: 10, Offset: 0}
+
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if parsed, err := strconv.Atoi(l); err == nil && parsed > 0 && parsed <= 100 {
+			params.Limit = parsed
+		}
+	}
+
+	if o := r.URL.Query().Get("offset"); o != "" {
+		if parsed, err := strconv.Atoi(o); err == nil && parsed >= 0 {
+			params.Offset = parsed
+		}
+	}
+
+	return params
+}
+
+func (bf BookFilters) buildWhereClause() (string, []interface{}) {
+	var conditions []string
+	var args []interface{}
+
+	if bf.Title != "" {
+		conditions = append(conditions, "title LIKE ?")
+		args = append(args, "%"+bf.Title+"%")
+	}
+	if bf.ISBN != "" {
+		conditions = append(conditions, "isbn = ?")
+		args = append(args, bf.ISBN)
+	}
+	if bf.Publisher != "" {
+		conditions = append(conditions, "publisher LIKE ?")
+		args = append(args, "%"+bf.Publisher+"%")
+	}
+
+	//join conditions with " AND " and prepend "WHERE" if there are any conditions
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	return whereClause, args
+}
+
 func New() (*Server, error) {
 	//set env to get (DSN) or data source name) for mysql
 	dsn := os.Getenv("CATALOG_DB_DSN")
@@ -111,6 +156,10 @@ func New() (*Server, error) {
 	v1.Handle("/books", s.wrapLimiter(s.handleBooks()))
 	//note: the trailing slash is important here to match /books/{id}
 	v1.Handle("/books/", s.wrapLimiter(s.handleBookByID()))
+	v1.Handle("/users", s.wrapLimiter(s.handleUsers()))
+	//same here
+	v1.Handle("/users/", s.wrapLimiter(s.handleUsers()))
+	//endpoints made by dan:
 	v1.Handle("/authors", s.wrapLimiter(s.handleAuthors()))
 	v1.Handle("/loans", s.wrapLimiter(s.handleLoans()))
 	// once again, trailing '/' is important here
@@ -151,18 +200,6 @@ func (s *Server) handleBooks() http.Handler {
 				return
 			}
 			defer rows.Close()
-
-			type book struct {
-				ID          int     `json:"id"`
-				ISBN        *string `json:"isbn"`
-				Title       string  `json:"title"`
-				PubDate     *string `json:"pubdate"`
-				Publisher   *string `json:"publisher"`
-				Edition     *string `json:"edition"`
-				Copies      int     `json:"copies"`
-				Thumbnail   []byte  `json:"thumbnail"`
-				LoanMetrics int     `json:"loanMetrics"`
-			}
 
 			var result []book
 			for rows.Next() {
@@ -273,6 +310,215 @@ func (s *Server) handleBookByID() http.Handler {
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
+	})
+}
+
+func (s *Server) handleUsers() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Extract caseID from path if present
+		caseID := strings.TrimPrefix(r.URL.Path, "/users/")
+
+		// If there's a caseID, handle single user operations
+		if caseID != "" {
+			s.handleSingleUser(w, r, caseID)
+			return
+		}
+
+		// Otherwise, handle collection operations
+		switch r.Method {
+		case http.MethodGet:
+			// List all users (with pagination)
+			pagination := parsePagination(r)
+			rows, err := s.db.QueryContext(r.Context(), `
+                SELECT caseID, role, isRestricted FROM users
+                ORDER BY caseID LIMIT ? OFFSET ?`,
+				pagination.Limit, pagination.Offset,
+			)
+			if err != nil {
+				http.Error(w, "query failed", http.StatusInternalServerError)
+				return
+			}
+			defer rows.Close()
+
+			var users []user
+			for rows.Next() {
+				var u user
+				if err := rows.Scan(&u.CaseID, &u.Role, &u.IsRestricted); err != nil {
+					http.Error(w, "scan failed", http.StatusInternalServerError)
+					return
+				}
+				users = append(users, u)
+			}
+
+			var total int
+			s.db.QueryRowContext(r.Context(), `SELECT COUNT(*) FROM users`).Scan(&total)
+
+			response := map[string]interface{}{
+				"data": users,
+				"pagination": map[string]interface{}{
+					"limit":   pagination.Limit,
+					"offset":  pagination.Offset,
+					"total":   total,
+					"hasMore": pagination.Offset+pagination.Limit < total,
+				},
+			}
+			writeJSON(w, http.StatusOK, response)
+
+		case http.MethodPost:
+			var u user
+			if err := decodeJSON(r, &u); err != nil {
+				http.Error(w, "invalid json", http.StatusBadRequest)
+				return
+			}
+			if u.CaseID == "" || u.Role == "" {
+				http.Error(w, "missing required fields", http.StatusBadRequest)
+				return
+			}
+
+			_, err := s.db.ExecContext(r.Context(), `
+                INSERT INTO users (caseID, role, isRestricted)
+                VALUES (?, ?, ?)`,
+				u.CaseID, u.Role, u.IsRestricted,
+			)
+			if err != nil {
+				http.Error(w, "insert failed", http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusCreated, map[string]string{"caseID": u.CaseID})
+
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+}
+
+func (s *Server) handleSingleUser(w http.ResponseWriter, r *http.Request, caseID string) {
+	switch r.Method {
+	case http.MethodGet:
+		var u user
+		err := s.db.QueryRowContext(r.Context(), `
+            SELECT caseID, role, isRestricted FROM users WHERE caseID = ?`,
+			caseID,
+		).Scan(&u.CaseID, &u.Role, &u.IsRestricted)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		if err != nil {
+			http.Error(w, "query failed", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, u)
+
+	case http.MethodPatch:
+		var updates user
+		if err := decodeJSON(r, &updates); err != nil {
+			http.Error(w, "invalid json", http.StatusBadRequest)
+			return
+		}
+		_, err := s.db.ExecContext(r.Context(), `
+            UPDATE users SET role = ?, isRestricted = ? WHERE caseID = ?`,
+			updates.Role, updates.IsRestricted, caseID,
+		)
+		if err != nil {
+			http.Error(w, "update failed", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	case http.MethodDelete:
+		res, err := s.db.ExecContext(r.Context(), `DELETE FROM users WHERE caseID = ?`, caseID)
+		if err != nil {
+			http.Error(w, "delete failed", http.StatusInternalServerError)
+			return
+		}
+		if rows, _ := res.RowsAffected(); rows == 0 {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handle search across books, authors, tags
+// note: we should get authors and tags endpoints working. this works without them but we need them
+// EXAMPLE: GET/api/v1/search?q=Stone&limit=5&offset=10
+func (s *Server) handleSearch() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		query := r.URL.Query().Get("q")
+		if query == "" {
+			http.Error(w, "missing search query", http.StatusBadRequest)
+			return
+		}
+
+		pagination := parsePagination(r)
+
+		//get total count of results
+		//this might be awful for performance but it works for now
+		var total int
+		err := s.db.QueryRowContext(r.Context(), `
+            SELECT COUNT(*) FROM (
+                SELECT bookID FROM books WHERE title LIKE ?
+                UNION
+                SELECT authID FROM authors WHERE fname LIKE ? OR lname LIKE ?
+                UNION
+                SELECT NULL FROM booktags WHERE tag LIKE ?
+            ) AS totalResults`,
+			"%"+query+"%", "%"+query+"%", "%"+query+"%", "%"+query+"%",
+		).Scan(&total)
+		if err != nil {
+			http.Error(w, "failed to count search results", http.StatusInternalServerError)
+			return
+		}
+
+		//get paginated results
+		rows, err := s.db.QueryContext(r.Context(), `
+            SELECT 'book' AS type, bookID AS id, title AS name FROM books WHERE title LIKE ?
+            UNION
+            SELECT 'author', authID, CONCAT(fname, ' ', lname) FROM authors WHERE fname LIKE ? OR lname LIKE ?
+            UNION
+            SELECT 'tag', NULL, tag FROM booktags WHERE tag LIKE ?
+            LIMIT ? OFFSET ?`,
+			"%"+query+"%", "%"+query+"%", "%"+query+"%", "%"+query+"%",
+			pagination.Limit, pagination.Offset,
+		)
+		if err != nil {
+			http.Error(w, "search query failed", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var results []map[string]interface{}
+		for rows.Next() {
+			var resultType string
+			var id sql.NullInt64
+			var name string
+			if err := rows.Scan(&resultType, &id, &name); err != nil {
+				http.Error(w, "scan failed", http.StatusInternalServerError)
+				return
+			}
+			results = append(results, map[string]interface{}{
+				"type": resultType,
+				"id":   id.Int64,
+				"name": name,
+			})
+		}
+
+		//build the response with the metadata for pagination
+		response := map[string]interface{}{
+			"data": results,
+			"pagination": map[string]interface{}{
+				"limit":   pagination.Limit,
+				"offset":  pagination.Offset,
+				"total":   total,
+				"hasMore": pagination.Offset+pagination.Limit < total,
+			},
+		}
+
+		writeJSON(w, http.StatusOK, response)
 	})
 }
 
