@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -17,8 +18,6 @@ import (
 	"golang.org/x/time/rate"
 )
 
-<<<<<<< Updated upstream
-=======
 //note a lot of this code is rly repetitive and could be abstracted better instead of just
 //having switch statements everywhere and writing the same boilerplate but save that for past the demo
 
@@ -43,7 +42,7 @@ type author struct {
 }
 
 type loan struct {
-	LoanID		int		  `json:"loanID"`
+	LoanID      int       `json:"loanID"`
 	BookID      int       `json:"bookID"`
 	CaseID      *string   `json:"caseID"`
 	LoanDate    time.Time `json:"loanDate"`
@@ -79,7 +78,6 @@ type BookFilters struct {
 	Publisher string
 }
 
->>>>>>> Stashed changes
 type Server struct {
 	db           *sql.DB
 	router       *http.ServeMux
@@ -283,24 +281,14 @@ func (s *Server) handleAuthors() http.Handler {
 		switch r.Method {
 		case http.MethodGet:
 			rows, error := s.db.QueryContext(r.Context(), `
-			SELECT authID, lname, fname FROM authors`, )
+			SELECT authID, lname, fname FROM authors`)
 			if error != nil {
 				http.Error(w, "query failed", http.StatusInternalServerError)
 				return
 			}
 			defer rows.Close()
 
-<<<<<<< Updated upstream
-			type authors struct {
-				AuthID int `json:"authID"`
-				LName *string `json:"lname"`
-				FName *string `json:"fname"`
-			}
-
-			var result []authors
-=======
 			var result []author
->>>>>>> Stashed changes
 
 			for rows.Next() {
 				var a author
@@ -316,9 +304,9 @@ func (s *Server) handleAuthors() http.Handler {
 
 		case http.MethodPost:
 			type payload struct {
-				AuthID int `json:"authID"`
-				LName *string `json:"lname"`
-				FName *string `json:"fname"`
+				AuthID int     `json:"authID"`
+				LName  *string `json:"lname"`
+				FName  *string `json:"fname"`
 			}
 			var body payload
 			if err := decodeJSON(r, &body); err != nil {
@@ -369,28 +357,13 @@ func (s *Server) handleLoans() http.Handler {
 		switch r.Method {
 		case http.MethodGet:
 			rows, error := s.db.QueryContext(r.Context(), `
-<<<<<<< Updated upstream
-			SELECT bookID, caseID, loanDate, dueDate, numRenewals FROM loan`, )
-=======
 			SELECT loanID, bookID, caseID, loanDate, dueDate, numRenewals FROM loan`)
->>>>>>> Stashed changes
 			if error != nil {
 				http.Error(w, "query failed", http.StatusInternalServerError)
 				return
 			}
 			defer rows.Close()
 
-<<<<<<< Updated upstream
-			type loan struct {
-				BookID int `json:"bookID"`
-				CaseID *string `json:"caseID"`
-				LoanDate time.Time `json:"loanDate"`
-				DueDate time.Time `json:"dueDate"`
-				NumRenewals int `json:"numRenewals"`
-			}
-
-=======
->>>>>>> Stashed changes
 			var result []loan
 
 			for rows.Next() {
@@ -407,20 +380,12 @@ func (s *Server) handleLoans() http.Handler {
 
 		case http.MethodPost:
 			type payload struct {
-<<<<<<< Updated upstream
-				BookID int `json:"bookID"`
-				CaseID *string `json:"caseID"`
-				LoanDate time.Time `json:"loanDate"`
-				DueDate time.Time `json:"dueDate"`
-				NumRenewals int `json:"numRenewals"`
-=======
 				LoanID      int       `json:"loanID"`
 				BookID      int       `json:"bookID"`
 				CaseID      *string   `json:"caseID"`
 				LoanDate    time.Time `json:"loanDate"`
 				DueDate     time.Time `json:"dueDate"`
 				NumRenewals int       `json:"numRenewals"`
->>>>>>> Stashed changes
 			}
 			var body payload
 			if err := decodeJSON(r, &body); err != nil {
@@ -450,8 +415,6 @@ func (s *Server) handleLoans() http.Handler {
 	})
 }
 
-<<<<<<< Updated upstream
-=======
 func (s *Server) handleLoansByLoanID(w http.ResponseWriter, r *http.Request, loanID int, isRenewing bool) {
 	switch r.Method {
 	case http.MethodGet:
@@ -477,14 +440,10 @@ func (s *Server) handleLoansByLoanID(w http.ResponseWriter, r *http.Request, loa
 				http.Error(w, "invalid json", http.StatusBadRequest)
 				return
 			}
-			
-			if updates.NumRenewals <= 0 {
-				http.Error(w, "maximum number of renewals for item exceeded", http.StatusNotAcceptable)
-			}
 
 			_, err := s.db.ExecContext(r.Context(), `
 				UPDATE loan SET loanDate = ?, dueDate = ?, numRenewals = ? WHERE loanID = ?`,
-				updates.LoanDate, updates.DueDate, updates.NumRenewals - 1, updates.LoanID,
+				updates.LoanDate, updates.DueDate, updates.NumRenewals+1, updates.LoanID,
 			)
 
 			if err != nil {
@@ -514,7 +473,6 @@ func (s *Server) handleLoansByLoanID(w http.ResponseWriter, r *http.Request, loa
 
 //add the other functions for authors and loans....
 
->>>>>>> Stashed changes
 // --- helpers ---
 
 func (s *Server) wrapLimiter(next http.Handler) http.Handler {
