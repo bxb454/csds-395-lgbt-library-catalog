@@ -1,7 +1,7 @@
 package api
 
 import (
-	//"context"
+	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
@@ -87,6 +87,14 @@ type Server struct {
 	rateBurst    int
 }
 
+func parseBookFilters(r *http.Request) BookFilters {
+	return BookFilters{
+		Title:     r.URL.Query().Get("title"),
+		ISBN:      r.URL.Query().Get("isbn"),
+		Publisher: r.URL.Query().Get("publisher"),
+	}
+}
+
 // simple pagination parser with defaults.
 func parsePagination(r *http.Request) PaginationParams {
 	params := PaginationParams{Limit: 10, Offset: 0}
@@ -156,6 +164,7 @@ func New() (*Server, error) {
 	v1.Handle("/books", s.wrapLimiter(s.handleBooks()))
 	//note: the trailing slash is important here to match /books/{id}
 	v1.Handle("/books/", s.wrapLimiter(s.handleBookByID()))
+	v1.Handle("/search", s.wrapLimiter(s.handleSearch()))
 	v1.Handle("/users", s.wrapLimiter(s.handleUsers()))
 	//same here
 	v1.Handle("/users/", s.wrapLimiter(s.handleUsers()))
@@ -179,6 +188,46 @@ func New() (*Server, error) {
 	return s, nil
 }
 
+func (s *Server) queryBooksWithFilters(ctx context.Context, filters BookFilters, pagination PaginationParams) ([]book, int, error) {
+	whereClause, args := filters.buildWhereClause()
+
+	//build main query, parse pagination params, and scan
+	query := `SELECT bookID, isbn, title, pubdate, publisher, edition, copies, thumbnail, loanMetrics FROM books` +
+		whereClause + ` ORDER BY bookID LIMIT ? OFFSET ?`
+	//we can use OFFSET keyword in SQL to skip a number of rows for offset pagination method
+	args = append(args, pagination.Limit, pagination.Offset)
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var result []book
+	for rows.Next() {
+		var b book
+		if err := rows.Scan(
+			&b.ID, &b.ISBN, &b.Title, &b.PubDate,
+			&b.Publisher, &b.Edition, &b.Copies, &b.Thumbnail, &b.LoanMetrics,
+		); err != nil {
+			return nil, 0, err
+		}
+		result = append(result, b)
+	}
+
+	//get the total count of books
+	countQuery := `SELECT COUNT(*) FROM books` + whereClause
+	//countArgs, _ := filters.buildWhereClause()
+	var total int
+	//exclude the limit and offset args for the count query
+	err = s.db.QueryRowContext(ctx, countQuery, args[:len(args)-2]...).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return result, total, nil
+}
+
 func (s *Server) Serve(addr string) error {
 	defer s.db.Close()
 	log.Printf("API server listening on %s", addr)
@@ -191,30 +240,26 @@ func (s *Server) handleBooks() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
-			rows, err := s.db.QueryContext(r.Context(), `
-                SELECT bookID, isbn, title, pubdate, publisher, edition, copies, loanMetrics
-                FROM books`,
-			)
+			pagination := parsePagination(r)
+			filters := parseBookFilters(r)
+
+			books, total, err := s.queryBooksWithFilters(r.Context(), filters, pagination)
 			if err != nil {
 				http.Error(w, "query failed", http.StatusInternalServerError)
 				return
 			}
-			defer rows.Close()
 
-			var result []book
-			for rows.Next() {
-				var b book
-				if err := rows.Scan(
-					&b.ID, &b.ISBN, &b.Title, &b.PubDate,
-					&b.Publisher, &b.Edition, &b.Copies, &b.LoanMetrics,
-				); err != nil {
-					http.Error(w, "scan failed", http.StatusInternalServerError)
-					return
-				}
-				result = append(result, b)
+			response := map[string]interface{}{
+				"data": books,
+				"pagination": map[string]interface{}{
+					"limit":   pagination.Limit,
+					"offset":  pagination.Offset,
+					"total":   total,
+					"hasMore": pagination.Offset+pagination.Limit < total,
+				},
 			}
 
-			writeJSON(w, http.StatusOK, result)
+			writeJSON(w, http.StatusOK, response)
 
 		case http.MethodPost:
 			type payload struct {
@@ -230,10 +275,13 @@ func (s *Server) handleBooks() http.Handler {
 				http.Error(w, "invalid json", http.StatusBadRequest)
 				return
 			}
+			//we can't have a book without a title or copies (aka the book doesn't exist)
 			if body.Title == "" || body.Copies <= 0 {
 				http.Error(w, "missing required fields", http.StatusBadRequest)
 				return
 			}
+
+			//loan metrics will be added by 1 every time it's checked out
 
 			res, err := s.db.ExecContext(r.Context(), `
                 INSERT INTO books (isbn, title, pubdate, publisher, edition, copies, thumbnail, loanMetrics)
@@ -716,8 +764,6 @@ func (s *Server) handleLoansByLoanID(w http.ResponseWriter, r *http.Request, loa
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
 }
-
-//add the other functions for authors and loans....
 
 // --- helpers ---
 
