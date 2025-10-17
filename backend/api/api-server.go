@@ -17,6 +17,69 @@ import (
 	"golang.org/x/time/rate"
 )
 
+<<<<<<< Updated upstream
+=======
+//note a lot of this code is rly repetitive and could be abstracted better instead of just
+//having switch statements everywhere and writing the same boilerplate but save that for past the demo
+
+// --- structs to define data types/models ---
+
+type book struct {
+	ID          int     `json:"id"`
+	ISBN        *string `json:"isbn"`
+	Title       string  `json:"title"`
+	PubDate     *string `json:"pubdate"`
+	Publisher   *string `json:"publisher"`
+	Edition     *string `json:"edition"`
+	Copies      int     `json:"copies"`
+	Thumbnail   []byte  `json:"thumbnail"`
+	LoanMetrics int     `json:"loanMetrics"`
+}
+
+type author struct {
+	AuthID int     `json:"authID"`
+	LName  *string `json:"lname"`
+	FName  *string `json:"fname"`
+}
+
+type loan struct {
+	LoanID		int		  `json:"loanID"`
+	BookID      int       `json:"bookID"`
+	CaseID      *string   `json:"caseID"`
+	LoanDate    time.Time `json:"loanDate"`
+	DueDate     time.Time `json:"dueDate"`
+	NumRenewals int       `json:"numRenewals"`
+}
+
+/*
+
+CREATE TABLE users(
+	caseID varchar(8) not null,
+    role enum('guest', 'patron', 'staff', 'admin') not null,
+    primary key(caseID),
+    isRestricted boolean not null
+);
+
+*/
+
+type user struct {
+	CaseID       string `json:"caseID"`
+	Role         string `json:"role"`
+	IsRestricted bool   `json:"isRestricted"`
+}
+
+type PaginationParams struct {
+	Limit  int
+	Offset int
+}
+
+type BookFilters struct {
+	Title     string
+	ISBN      string
+	Publisher string
+}
+
+>>>>>>> Stashed changes
 type Server struct {
 	db           *sql.DB
 	router       *http.ServeMux
@@ -52,6 +115,9 @@ func New() (*Server, error) {
 	v1.Handle("/books/", s.wrapLimiter(s.handleBookByID()))
 	v1.Handle("/authors", s.wrapLimiter(s.handleAuthors()))
 	v1.Handle("/loans", s.wrapLimiter(s.handleLoans()))
+	// once again, trailing '/' is important here
+	// url extension will be in the form "/loans/{loanID}, or /loans/{loanID}/renew"
+	v1.Handle("/loans/", s.wrapLimiter(s.handleLoans()))
 
 	s.router.Handle("/api/v1/", http.StripPrefix("/api/v1", v1))
 	s.router.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -224,6 +290,7 @@ func (s *Server) handleAuthors() http.Handler {
 			}
 			defer rows.Close()
 
+<<<<<<< Updated upstream
 			type authors struct {
 				AuthID int `json:"authID"`
 				LName *string `json:"lname"`
@@ -231,9 +298,13 @@ func (s *Server) handleAuthors() http.Handler {
 			}
 
 			var result []authors
+=======
+			var result []author
+>>>>>>> Stashed changes
 
 			for rows.Next() {
 				var a authors
+				var a author
 				if error := rows.Scan(
 					&a.AuthID, &a.LName, &a.FName,
 				); error != nil {
@@ -280,16 +351,37 @@ func (s *Server) handleAuthors() http.Handler {
 
 func (s *Server) handleLoans() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := strings.TrimPrefix(r.URL.Path, "/loans/")
+		if id != "" {
+			// splitID[0] will hold the loanID, splitID[1] will hold "renew" if the user is renewing, should be empty otherwise
+			splitID := strings.Split(id, "/")
+			isRenewing := false
+
+			if len(splitID) > 1 && splitID[1] == "renew" {
+				isRenewing = true
+			}
+
+			if loanID, err := strconv.Atoi(splitID[0]); err == nil {
+				s.handleLoansByLoanID(w, r, loanID, isRenewing)
+				return
+			}
+		}
+
 		switch r.Method {
 		case http.MethodGet:
 			rows, error := s.db.QueryContext(r.Context(), `
+<<<<<<< Updated upstream
 			SELECT bookID, caseID, loanDate, dueDate, numRenewals FROM loan`, )
+=======
+			SELECT loanID, bookID, caseID, loanDate, dueDate, numRenewals FROM loan`)
+>>>>>>> Stashed changes
 			if error != nil {
 				http.Error(w, "query failed", http.StatusInternalServerError)
 				return
 			}
 			defer rows.Close()
 
+<<<<<<< Updated upstream
 			type loan struct {
 				BookID int `json:"bookID"`
 				CaseID *string `json:"caseID"`
@@ -298,12 +390,15 @@ func (s *Server) handleLoans() http.Handler {
 				NumRenewals int `json:"numRenewals"`
 			}
 
+=======
+>>>>>>> Stashed changes
 			var result []loan
 
 			for rows.Next() {
 				var l loan
 				if error := rows.Scan(
 					&l.BookID, &l.CaseID, &l.LoanDate, &l.DueDate, &l.NumRenewals,
+					&l.LoanID, &l.BookID, &l.CaseID, &l.LoanDate, &l.DueDate, &l.NumRenewals,
 				); error != nil {
 					http.Error(w, "Scan failed", http.StatusInternalServerError)
 					return
@@ -314,11 +409,20 @@ func (s *Server) handleLoans() http.Handler {
 
 		case http.MethodPost:
 			type payload struct {
+<<<<<<< Updated upstream
 				BookID int `json:"bookID"`
 				CaseID *string `json:"caseID"`
 				LoanDate time.Time `json:"loanDate"`
 				DueDate time.Time `json:"dueDate"`
 				NumRenewals int `json:"numRenewals"`
+=======
+				LoanID      int       `json:"loanID"`
+				BookID      int       `json:"bookID"`
+				CaseID      *string   `json:"caseID"`
+				LoanDate    time.Time `json:"loanDate"`
+				DueDate     time.Time `json:"dueDate"`
+				NumRenewals int       `json:"numRenewals"`
+>>>>>>> Stashed changes
 			}
 			var body payload
 			if err := decodeJSON(r, &body); err != nil {
@@ -334,6 +438,9 @@ func (s *Server) handleLoans() http.Handler {
                 INSERT INTO loan (bookID, caseID, loanDate, dueDate, numRenewals)
                 VALUES (?, ?, ?, ?, 0)`,
 				body.BookID, body.CaseID, body.LoanDate, body.DueDate, body.NumRenewals,
+                INSERT INTO loan (loanID, bookID, caseID, loanDate, dueDate, numRenewals)
+                VALUES (?, ?, ?, ?, ?, 0)`,
+				body.LoanID, body.BookID, body.CaseID, body.LoanDate, body.DueDate, body.NumRenewals,
 			)
 			if err != nil {
 				http.Error(w, "insert failed", http.StatusInternalServerError)
@@ -348,6 +455,71 @@ func (s *Server) handleLoans() http.Handler {
 	})
 }
 
+<<<<<<< Updated upstream
+=======
+func (s *Server) handleLoansByLoanID(w http.ResponseWriter, r *http.Request, loanID int, isRenewing bool) {
+	switch r.Method {
+	case http.MethodGet:
+		var l loan
+		err := s.db.QueryRowContext(r.Context(), `
+            SELECT loanID, bookID, caseID, loanDate, dueDate, numRenewals FROM loans WHERE loanID = ?`,
+			loanID,
+		).Scan(&l.LoanID, &l.BookID, &l.CaseID, &l.LoanDate, &l.DueDate, &l.NumRenewals)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		if err != nil {
+			http.Error(w, "query failed", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, l)
+
+	case http.MethodPatch:
+		if isRenewing {
+			var updates loan
+			if err := decodeJSON(r, &updates); err != nil {
+				http.Error(w, "invalid json", http.StatusBadRequest)
+				return
+			}
+			
+			if updates.NumRenewals <= 0 {
+				http.Error(w, "maximum number of renewals for item exceeded", http.StatusNotAcceptable)
+			}
+
+			_, err := s.db.ExecContext(r.Context(), `
+				UPDATE loan SET loanDate = ?, dueDate = ?, numRenewals = ? WHERE loanID = ?`,
+				updates.LoanDate, updates.DueDate, updates.NumRenewals - 1, updates.LoanID,
+			)
+
+			if err != nil {
+				http.Error(w, "update failed", http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusNoContent)
+		}
+
+	case http.MethodDelete:
+		res, err := s.db.ExecContext(r.Context(), `DELETE FROM loan WHERE loanID = ?`, loanID)
+		if err != nil {
+			http.Error(w, "delete failed", http.StatusInternalServerError)
+			return
+		}
+		if rows, _ := res.RowsAffected(); rows == 0 {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+//add the other functions for authors and loans....
+
+>>>>>>> Stashed changes
 // --- helpers ---
 
 func (s *Server) wrapLimiter(next http.Handler) http.Handler {
