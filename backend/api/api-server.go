@@ -303,7 +303,6 @@ func (s *Server) handleAuthors() http.Handler {
 >>>>>>> Stashed changes
 
 			for rows.Next() {
-				var a authors
 				var a author
 				if error := rows.Scan(
 					&a.AuthID, &a.LName, &a.FName,
@@ -397,7 +396,6 @@ func (s *Server) handleLoans() http.Handler {
 			for rows.Next() {
 				var l loan
 				if error := rows.Scan(
-					&l.BookID, &l.CaseID, &l.LoanDate, &l.DueDate, &l.NumRenewals,
 					&l.LoanID, &l.BookID, &l.CaseID, &l.LoanDate, &l.DueDate, &l.NumRenewals,
 				); error != nil {
 					http.Error(w, "Scan failed", http.StatusInternalServerError)
@@ -435,9 +433,6 @@ func (s *Server) handleLoans() http.Handler {
 			}
 
 			res, err := s.db.ExecContext(r.Context(), `
-                INSERT INTO loan (bookID, caseID, loanDate, dueDate, numRenewals)
-                VALUES (?, ?, ?, ?, 0)`,
-				body.BookID, body.CaseID, body.LoanDate, body.DueDate, body.NumRenewals,
                 INSERT INTO loan (loanID, bookID, caseID, loanDate, dueDate, numRenewals)
                 VALUES (?, ?, ?, ?, ?, 0)`,
 				body.LoanID, body.BookID, body.CaseID, body.LoanDate, body.DueDate, body.NumRenewals,
