@@ -1,7 +1,6 @@
 package api
 
 import (
-	//"context"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -12,79 +11,19 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/rs/cors"
 	"golang.org/x/time/rate"
 )
 
 //note a lot of this code is rly repetitive and could be abstracted better instead of just
 //having switch statements everywhere and writing the same boilerplate but save that for past the demo
 
-// --- structs to define data types/models ---
+//structs moved into models.go
 
-type book struct {
-	ID          int     `json:"id"`
-	ISBN        *string `json:"isbn"`
-	Title       string  `json:"title"`
-	PubDate     *string `json:"pubdate"`
-	Publisher   *string `json:"publisher"`
-	Edition     *string `json:"edition"`
-	Copies      int     `json:"copies"`
-	Thumbnail   []byte  `json:"thumbnail"`
-	LoanMetrics int     `json:"loanMetrics"`
-}
-
-/*
-type author struct {
-
-}
-*/
-
-/* type loan struct {
-
-} */
-
-/*
-
-CREATE TABLE users(
-	caseID varchar(8) not null,
-    role enum('guest', 'patron', 'staff', 'admin') not null,
-    primary key(caseID),
-    isRestricted boolean not null
-);
-
-*/
-
-type user struct {
-	CaseID       string `json:"caseID"`
-	Role         string `json:"role"`
-	IsRestricted bool   `json:"isRestricted"`
-}
-
-type PaginationParams struct {
-	Limit  int
-	Offset int
-}
-
-type BookFilters struct {
-	Title     string
-	ISBN      string
-	Publisher string
-}
-
-type Server struct {
-	db           *sql.DB
-	router       *http.ServeMux
-	limiters     map[string]*rate.Limiter
-	limitMu      sync.Mutex
-	rateInterval time.Duration
-	rateBurst    int
-}
-
-// --- end structs ---
-
+// parsing book filters for /books endpoint for filtering
 func parseBookFilters(r *http.Request) BookFilters {
 	return BookFilters{
 		Title:     r.URL.Query().Get("title"),
@@ -94,6 +33,7 @@ func parseBookFilters(r *http.Request) BookFilters {
 }
 
 // simple pagination parser with defaults.
+// this is helper function. move to bottom.
 func parsePagination(r *http.Request) PaginationParams {
 	params := PaginationParams{Limit: 10, Offset: 0}
 
@@ -112,6 +52,7 @@ func parsePagination(r *http.Request) PaginationParams {
 	return params
 }
 
+// another helper function. move to bottom.
 func (bf BookFilters) buildWhereClause() (string, []interface{}) {
 	var conditions []string
 	var args []interface{}
@@ -160,18 +101,25 @@ func New() (*Server, error) {
 		rateBurst:    10,
 	}
 
+	//use multiplexing with a router so we can have a single connection to serve multiple requests
 	v1 := http.NewServeMux()
 	//boris endpoints
 	v1.Handle("/books", s.wrapLimiter(s.handleBooks()))
 	//note: the trailing slash is important here to match /books/{id}
 	v1.Handle("/books/", s.wrapLimiter(s.handleBookByID()))
+	//extra endpoint for getting book-author relationships (totally forgot about this)
+	v1.Handle("/books/", s.wrapLimiter(s.handleBookRelations()))
 	v1.Handle("/search", s.wrapLimiter(s.handleSearch()))
 	v1.Handle("/users", s.wrapLimiter(s.handleUsers()))
 	//same here
 	v1.Handle("/users/", s.wrapLimiter(s.handleUsers()))
+	v1.Handle("/tags", s.wrapLimiter(s.handleTags()))
 	//endpoints made by dan:
 	v1.Handle("/authors", s.wrapLimiter(s.handleAuthors()))
 	v1.Handle("/loans", s.wrapLimiter(s.handleLoans()))
+	// once again, trailing '/' is important here
+	// url extension will be in the form "/loans/{loanID}, or /loans/{loanID}/renew"
+	v1.Handle("/loans/", s.wrapLimiter(s.handleLoans()))
 
 	s.router.Handle("/api/v1/", http.StripPrefix("/api/v1", v1))
 	s.router.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
@@ -229,7 +177,16 @@ func (s *Server) queryBooksWithFilters(ctx context.Context, filters BookFilters,
 func (s *Server) Serve(addr string) error {
 	defer s.db.Close()
 	log.Printf("API server listening on %s", addr)
-	return http.ListenAndServe(addr, s.router)
+
+	//CORS middleware so it can run on multiple ports (frontend and backend)
+	corsOptions := cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Content-Type", "Authorization"},
+		AllowCredentials: true,
+	})
+
+	return http.ListenAndServe(addr, corsOptions.Handler(s.router))
 }
 
 // --- handlers (trimmed for brevity) ---
@@ -343,6 +300,38 @@ func (s *Server) handleBookByID() http.Handler {
 				"copies":      copies,
 				"loanMetrics": loanMetrics,
 			})
+		//conflicted between patch and put for this one
+		case http.MethodPut:
+			type payload struct {
+				ISBN      *string `json:"isbn"`
+				Title     string  `json:"title"`
+				PubDate   *string `json:"pubdate"`
+				Publisher *string `json:"publisher"`
+				Edition   *string `json:"edition"`
+				Copies    int     `json:"copies"`
+			}
+			var body payload
+			if errors := decodeJSON(r, &body); errors != nil {
+				http.Error(w, "invalid json", http.StatusBadRequest)
+				return
+			}
+			if body.Title == "" || body.Copies <= 0 {
+				http.Error(w, "missing required fields", http.StatusBadRequest)
+				return
+			}
+
+			res, err := s.db.ExecContext(r.Context(), ` UPDATE books SET isbn = ?, title = ?, pubdate = ?,
+			publisher = ?, edition = ?, copies = ? WHERE bookID = ?`,
+				body.ISBN, body.Title, body.PubDate, body.Publisher, body.Edition, body.Copies, id)
+			if err != nil {
+				http.Error(w, "update failed", http.StatusInternalServerError)
+				return
+			}
+			if rows, _ := res.RowsAffected(); rows == 0 {
+				http.NotFound(w, r)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
 
 		case http.MethodDelete:
 			res, err := s.db.ExecContext(r.Context(), `DELETE FROM books WHERE bookID = ?`, id)
@@ -362,12 +351,242 @@ func (s *Server) handleBookByID() http.Handler {
 	})
 }
 
+func (s *Server) handleBookRelations() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		//path: /books/{bookID}/authors or /books/{bookID}/tags
+		path := strings.TrimPrefix(r.URL.Path, "/books/")
+		parts := strings.Split(path, "/")
+
+		if len(parts) < 2 {
+			http.NotFound(w, r)
+			return
+		}
+
+		//parts[0] always bookID, parts[1] is relation type
+		bookID := parts[0]
+		relation := parts[1]
+
+		switch relation {
+		case "authors":
+			s.handleBookAuthors(w, r, bookID)
+		case "tags":
+			s.handleBookTags(w, r, bookID)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+func (s *Server) handleBookTags(w http.ResponseWriter, r *http.Request, bookID string) {
+	switch r.Method {
+	case http.MethodGet:
+		// List all tags for this book
+		//tags are strings
+		rows, err := s.db.QueryContext(r.Context(), `
+            SELECT tag FROM booktags WHERE bookID = ?`,
+			bookID,
+		)
+		if err != nil {
+			http.Error(w, "query failed", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var tags []string
+		for rows.Next() {
+			var tag string
+			if err := rows.Scan(&tag); err != nil {
+				http.Error(w, "scan failed", http.StatusInternalServerError)
+				return
+			}
+			tags = append(tags, tag)
+		}
+		writeJSON(w, http.StatusOK, tags)
+
+	case http.MethodPost:
+		type payload struct {
+			Tag string `json:"tag"`
+		}
+		var body payload
+		if err := decodeJSON(r, &body); err != nil {
+			http.Error(w, "invalid json", http.StatusBadRequest)
+			return
+		}
+		if body.Tag == "" {
+			http.Error(w, "missing tag", http.StatusBadRequest)
+			return
+		}
+
+		_, err := s.db.ExecContext(r.Context(), `
+            INSERT INTO booktags (bookID, tag)
+            VALUES (?, ?)`,
+			bookID, body.Tag,
+		)
+		if err != nil {
+			http.Error(w, "insert failed", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+
+	case http.MethodDelete:
+		//DELETE /books/{bookID}/tags/{tag}
+		path := strings.TrimPrefix(r.URL.Path, "/books/"+bookID+"/tags/")
+		tag := path
+		if tag == "" {
+			http.Error(w, "missing tag", http.StatusBadRequest)
+			return
+		}
+
+		res, err := s.db.ExecContext(r.Context(), `
+            DELETE FROM booktags WHERE bookID = ? AND tag = ?`,
+			bookID, tag,
+		)
+		if err != nil {
+			http.Error(w, "delete failed", http.StatusInternalServerError)
+			return
+		}
+		if rows, _ := res.RowsAffected(); rows == 0 {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handle tags endpoint
+// sample GET: /api/v1/tags - list all tags in the system
+func (s *Server) handleTags() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		//select distinct to avoid duplicates
+		rows, err := s.db.QueryContext(r.Context(), `
+            SELECT DISTINCT tag FROM booktags ORDER BY tag`,
+		)
+		if err != nil {
+			http.Error(w, "query failed", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		var tags []string
+		for rows.Next() {
+			var tag string
+			if err := rows.Scan(&tag); err != nil {
+				http.Error(w, "scan failed", http.StatusInternalServerError)
+				return
+			}
+			tags = append(tags, tag)
+		}
+		writeJSON(w, http.StatusOK, tags)
+	})
+}
+
+// GET /books/{bookID}/authors
+// POST /books/{bookID}/authors
+// DELETE /books/{bookID}/authors/{authID}
+func (s *Server) handleBookAuthors(w http.ResponseWriter, r *http.Request, bookID string) {
+	switch r.Method {
+	case http.MethodGet:
+		// List all authors for this book
+		rows, err := s.db.QueryContext(r.Context(), `
+            SELECT a.authID, a.lname, a.fname
+            FROM authors a
+            INNER JOIN bookAuthor ba ON a.authID = ba.authID
+            WHERE ba.bookID = ?`,
+			bookID,
+		)
+		if err != nil {
+			http.Error(w, "query failed", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+
+		type author struct {
+			AuthID int     `json:"authID"`
+			LName  string  `json:"lname"`
+			FName  *string `json:"fname"`
+		}
+
+		var authors []author
+		for rows.Next() {
+			var a author
+			var fname sql.NullString
+			if err := rows.Scan(&a.AuthID, &a.LName, &fname); err != nil {
+				http.Error(w, "scan failed", http.StatusInternalServerError)
+				return
+			}
+			a.FName = nullString(fname)
+			authors = append(authors, a)
+		}
+		writeJSON(w, http.StatusOK, authors)
+
+	case http.MethodPost:
+		// Add an author to this book
+		type payload struct {
+			AuthID int `json:"authID"`
+		}
+		var body payload
+		if err := decodeJSON(r, &body); err != nil {
+			http.Error(w, "invalid json", http.StatusBadRequest)
+			return
+		}
+		if body.AuthID <= 0 {
+			http.Error(w, "missing authID", http.StatusBadRequest)
+			return
+		}
+
+		_, err := s.db.ExecContext(r.Context(), `
+            INSERT INTO bookAuthor (bookID, authID)
+            VALUES (?, ?)`,
+			bookID, body.AuthID,
+		)
+		if err != nil {
+			http.Error(w, "insert failed", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+
+	case http.MethodDelete:
+		// DELETE /books/{bookID}/authors/{authID}
+		path := strings.TrimPrefix(r.URL.Path, "/books/"+bookID+"/authors/")
+		authID := path
+		if authID == "" {
+			http.Error(w, "missing authID", http.StatusBadRequest)
+			return
+		}
+
+		res, err := s.db.ExecContext(r.Context(), `
+            DELETE FROM bookAuthor WHERE bookID = ? AND authID = ?`,
+			bookID, authID,
+		)
+		if err != nil {
+			http.Error(w, "delete failed", http.StatusInternalServerError)
+			return
+		}
+		if rows, _ := res.RowsAffected(); rows == 0 {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 func (s *Server) handleUsers() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Extract caseID from path if present
 		caseID := strings.TrimPrefix(r.URL.Path, "/users/")
 
-		// If there's a caseID, handle single user operations
+		//If there's a caseID, handle single user operations
 		if caseID != "" {
 			s.handleSingleUser(w, r, caseID)
 			return
@@ -584,16 +803,10 @@ func (s *Server) handleAuthors() http.Handler {
 			}
 			defer rows.Close()
 
-			type authors struct {
-				AuthID int     `json:"authID"`
-				LName  *string `json:"lname"`
-				FName  *string `json:"fname"`
-			}
-
-			var result []authors
+			var result []author
 
 			for rows.Next() {
-				var a authors
+				var a author
 				if error := rows.Scan(
 					&a.AuthID, &a.LName, &a.FName,
 				); error != nil {
@@ -638,33 +851,41 @@ func (s *Server) handleAuthors() http.Handler {
 	})
 }
 
-// dan also wrote this
+// dan handleLoans function from his branch
 func (s *Server) handleLoans() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := strings.TrimPrefix(r.URL.Path, "/loans/")
+		if id != "" {
+			// splitID[0] will hold the loanID, splitID[1] will hold "renew" if the user is renewing, should be empty otherwise
+			splitID := strings.Split(id, "/")
+			isRenewing := false
+
+			if len(splitID) > 1 && splitID[1] == "renew" {
+				isRenewing = true
+			}
+
+			if loanID, err := strconv.Atoi(splitID[0]); err == nil {
+				s.handleLoansByLoanID(w, r, loanID, isRenewing)
+				return
+			}
+		}
+
 		switch r.Method {
 		case http.MethodGet:
 			rows, error := s.db.QueryContext(r.Context(), `
-			SELECT bookID, caseID, loanDate, dueDate, numRenewals FROM loan`)
+			SELECT loanID, bookID, caseID, loanDate, dueDate, numRenewals FROM loan`)
 			if error != nil {
 				http.Error(w, "query failed", http.StatusInternalServerError)
 				return
 			}
 			defer rows.Close()
 
-			type loan struct {
-				BookID      int       `json:"bookID"`
-				CaseID      *string   `json:"caseID"`
-				LoanDate    time.Time `json:"loanDate"`
-				DueDate     time.Time `json:"dueDate"`
-				NumRenewals int       `json:"numRenewals"`
-			}
-
 			var result []loan
 
 			for rows.Next() {
 				var l loan
 				if error := rows.Scan(
-					&l.BookID, &l.CaseID, &l.LoanDate, &l.DueDate, &l.NumRenewals,
+					&l.LoanID, &l.BookID, &l.CaseID, &l.LoanDate, &l.DueDate, &l.NumRenewals,
 				); error != nil {
 					http.Error(w, "Scan failed", http.StatusInternalServerError)
 					return
@@ -675,6 +896,7 @@ func (s *Server) handleLoans() http.Handler {
 
 		case http.MethodPost:
 			type payload struct {
+				LoanID      int       `json:"loanID"`
 				BookID      int       `json:"bookID"`
 				CaseID      *string   `json:"caseID"`
 				LoanDate    time.Time `json:"loanDate"`
@@ -692,9 +914,9 @@ func (s *Server) handleLoans() http.Handler {
 			}
 
 			res, err := s.db.ExecContext(r.Context(), `
-                INSERT INTO loan (bookID, caseID, loanDate, dueDate, numRenewals)
-                VALUES (?, ?, ?, ?, 0)`,
-				body.BookID, body.CaseID, body.LoanDate, body.DueDate, body.NumRenewals,
+                INSERT INTO loan (loanID, bookID, caseID, loanDate, dueDate, numRenewals)
+                VALUES (?, ?, ?, ?, ?, 0)`,
+				body.LoanID, body.BookID, body.CaseID, body.LoanDate, body.DueDate, body.NumRenewals,
 			)
 			if err != nil {
 				http.Error(w, "insert failed", http.StatusInternalServerError)
@@ -709,7 +931,65 @@ func (s *Server) handleLoans() http.Handler {
 	})
 }
 
-//add the other functions for authors and loans....
+func (s *Server) handleLoansByLoanID(w http.ResponseWriter, r *http.Request, loanID int, isRenewing bool) {
+	switch r.Method {
+	case http.MethodGet:
+		var l loan
+		err := s.db.QueryRowContext(r.Context(), `
+            SELECT loanID, bookID, caseID, loanDate, dueDate, numRenewals FROM loans WHERE loanID = ?`,
+			loanID,
+		).Scan(&l.LoanID, &l.BookID, &l.CaseID, &l.LoanDate, &l.DueDate, &l.NumRenewals)
+		if errors.Is(err, sql.ErrNoRows) {
+			http.NotFound(w, r)
+			return
+		}
+		if err != nil {
+			http.Error(w, "query failed", http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, l)
+
+	case http.MethodPatch:
+		if isRenewing {
+			var updates loan
+			if err := decodeJSON(r, &updates); err != nil {
+				http.Error(w, "invalid json", http.StatusBadRequest)
+				return
+			}
+
+			//AddDate (years, months, days)
+			//extend due date by 14 days automatically
+			newDueDate := updates.DueDate.AddDate(0, 0, 14)
+
+			_, err := s.db.ExecContext(r.Context(), `
+				UPDATE loan SET loanDate = ?, dueDate = ?, numRenewals = ? WHERE loanID = ?`,
+				updates.LoanDate, newDueDate, updates.NumRenewals+1, updates.LoanID,
+			)
+
+			if err != nil {
+				http.Error(w, "update failed", http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusNoContent)
+		}
+
+	case http.MethodDelete:
+		res, err := s.db.ExecContext(r.Context(), `DELETE FROM loan WHERE loanID = ?`, loanID)
+		if err != nil {
+			http.Error(w, "delete failed", http.StatusInternalServerError)
+			return
+		}
+		if rows, _ := res.RowsAffected(); rows == 0 {
+			http.NotFound(w, r)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
 
 // --- helpers ---
 
