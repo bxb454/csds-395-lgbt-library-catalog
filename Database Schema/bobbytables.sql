@@ -49,6 +49,7 @@ CREATE TABLE users(
     isRestricted boolean not null
 );
 
+/*
 CREATE TABLE loan(
 	bookID int not null,
     caseID varchar(8) not null,
@@ -59,6 +60,21 @@ CREATE TABLE loan(
     foreign key(caseID) references users(caseID),
     primary key(bookID, caseID, loanDate)
 )
+*/
+
+CREATE TABLE loan(
+    loanID int auto_increment not null,
+    bookID int not null, 
+    caseID varchar(8) not null, 
+    loanDate date not null,
+    dueDate date not null,
+    numRenewals int not null,
+    foreign key(bookID) references books(bookID), 
+    foreign key(caseID) references users(caseID),
+    primary key(loanID),
+    unique key(bookID, caseID, loanDate) 
+) auto_increment = 1000;
+
 
 
 
