@@ -9,9 +9,9 @@ import (
 
 	//"strings"
 
-	//"./cas"
+	//"../cas"
 	api "github.com/bxb454/csds-395-lgbt-library-catalog/api"
-	cas_test "github.com/bxb454/csds-395-lgbt-library-catalog/cas"
+	//cas_test "github.com/bxb454/csds-395-lgbt-library-catalog/cas"
 )
 
 func main() {
@@ -47,7 +47,7 @@ func startAuthServer() {
 	flag.Parse()
 
 	fmt.Printf("Starting CAS authentication server on port %s...\n", *port)
-	cas_test.RunCASServer(*port)
+	//cas_test.RunCASServer(*port)
 }
 
 func startAPIServer() {
