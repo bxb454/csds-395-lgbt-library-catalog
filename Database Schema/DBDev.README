@@ -1,0 +1,25 @@
+Author: Fei Triolo
+
+---DEVELOPMENT WORKFLOW FOR DATABASE END---
+Until we get UTech server space to host the databse and backend, 
+all database development must be done on local clones of the MYSQL database
+
+If you are contributing to database-level features, do the following steps:
+
+    1. Download MYSQL installer and install full package for user, client and dev tools. Follow the prompts to set up a local DB instance
+        I found these guides helpful if you get lost:
+        https://dev.mysql.com/doc/mysql-getting-started/en/
+        https://www.youtube.com/watch?v=wgRwITQHszU
+
+        Make sure your local instance has an initialized database schema
+
+    2. Open the existing sql files in your DBMS and run the necessary Database Definition Statements so that your database is current with development
+        Start with bobbytables.sql to get the basic schema for the library catalog
+        Any CREATE TABLE/FUNCTION/PROCEDURE/etc Statements
+        Any ALTER TABLE/... Statements
+        Any DROP Statements (or don't run the CREATE statements whose objects are later DROPped at all)
+
+    3. Load any relevant filler data into your tables
+    4. Continue development of the db schema in a new .sql file in the repo
+    5. Make sure your commits are documented so other devs know how to update their own instance of the schema.
+
