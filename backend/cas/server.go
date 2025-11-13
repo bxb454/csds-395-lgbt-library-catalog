@@ -1,9 +1,11 @@
 package cas
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 
 	cas_auth "gopkg.in/cas.v2"
 )
@@ -47,8 +49,25 @@ func RunCASServer(port string) {
 		cas_auth.RedirectToLogout(w, r)
 	})
 
+	// Log in
+	mux.HandleFunc("/login", func (w http.ResponseWriter, r *http.Request) {
+		// Look for a ticket in the query section of the URL, this indicates the user has returned from the CAS redirect
+		//fmt.Println(r.URL) // these printlns can be removed after function and testing is completed
+		cas_auth.RedirectToLogin(w, r)
+		user := cas_auth.Username(r)
+		fmt.Println(user)
+		/*cas_url, _ := url.Parse("httpd://lgbt-cat.case.edu" + r.URL.String())
+		query := cas_url.RawQuery
+		//fmt.Println(query)
+		if ticket := strings.Split(query, "ticket=")[1]; ticket != "" { 
+			resp, _ := http.Get("https://login.case.edu/cas/serviceValidate?ticket=" + ticket + "&amp;service=httpd://lgbt-cat.case.edu/login")
+			fmt.Println(resp.Body)
+		}*/
+	})
+
 	// Create CAS client middleware
-	casURL, _ := url.Parse("https://login.case.edu/cas")
+	casURL, _ := url.Parse("https://login.case.edu/cas?ticket=ST-3555-McPZ4NKfx6S0EhnCEkHc")
+	fmt.Println(casURL.RawQuery)
 	client := cas_auth.NewClient(&cas_auth.Options{
 		URL: casURL,
 	})
