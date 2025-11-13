@@ -11,7 +11,7 @@ import (
 
 	//"../cas"
 	api "github.com/bxb454/csds-395-lgbt-library-catalog/api"
-	//cas_test "github.com/bxb454/csds-395-lgbt-library-catalog/cas"
+	cas_test "github.com/bxb454/csds-395-lgbt-library-catalog/cas"
 )
 
 func main() {
@@ -34,7 +34,7 @@ func main() {
 	case "api-server":
 		startAPIServer()
 	case "test-cas":
-		//cas_test.RunCASTest()
+		cas_test.RunCASServer("8080")
 	case "test-simple":
 		//runSimpleTest()
 	default:
