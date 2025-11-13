@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	"strings"
+	//"strings"
 
 	cas_auth "gopkg.in/cas.v2"
 )
