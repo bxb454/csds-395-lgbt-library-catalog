@@ -82,6 +82,7 @@ func (bf BookFilters) buildWhereClause() (string, []interface{}) {
 func New() (*Server, error) {
 	//set env to get (DSN) or data source name) for mysql
 	dsn := os.Getenv("CATALOG_DB_DSN")
+	log.Printf("DEBUG: Using DSN: %s", dsn)
 	if dsn == "" {
 		return nil, errors.New("CATALOG_DB_DSN not set")
 	}
@@ -108,7 +109,8 @@ func New() (*Server, error) {
 	//note: the trailing slash is important here to match /books/{id}
 	v1.Handle("/books/", s.wrapLimiter(s.handleBookByID()))
 	//extra endpoint for getting book-author relationships (totally forgot about this)
-	v1.Handle("/books/", s.wrapLimiter(s.handleBookRelations()))
+	//NOTE: ONE ENDPOINT PER FUNCTION OR ELSE THERE WILL BE CONFLICTS
+	//v1.Handle("/books/", s.wrapLimiter(s.handleBookRelations()))
 	v1.Handle("/search", s.wrapLimiter(s.handleSearch()))
 	v1.Handle("/users", s.wrapLimiter(s.handleUsers()))
 	//same here
@@ -260,7 +262,30 @@ func (s *Server) handleBooks() http.Handler {
 // no need for pagination since it's just one item
 func (s *Server) handleBookByID() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id := strings.TrimPrefix(r.URL.Path, "/books/")
+
+		//path: /books/{bookID}/authors or /books/{bookID}/tags
+		path := strings.TrimPrefix(r.URL.Path, "/books/")
+		parts := strings.Split(path, "/")
+
+		if len(parts) < 2 {
+			http.NotFound(w, r)
+			return
+		}
+
+		//parts[0] always bookID, parts[1] is relation type
+		bookID := parts[0]
+		relation := parts[1]
+
+		switch relation {
+		case "authors":
+			s.handleBookAuthors(w, r, bookID)
+		case "tags":
+			s.handleBookTags(w, r, bookID)
+		default:
+			http.NotFound(w, r)
+		}
+
+		id := path
 		if id == "" {
 			http.Error(w, "missing id", http.StatusBadRequest)
 			return
@@ -351,6 +376,7 @@ func (s *Server) handleBookByID() http.Handler {
 	})
 }
 
+/*
 func (s *Server) handleBookRelations() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		//path: /books/{bookID}/authors or /books/{bookID}/tags
@@ -376,6 +402,7 @@ func (s *Server) handleBookRelations() http.Handler {
 		}
 	})
 }
+*/
 
 func (s *Server) handleBookTags(w http.ResponseWriter, r *http.Request, bookID string) {
 	switch r.Method {

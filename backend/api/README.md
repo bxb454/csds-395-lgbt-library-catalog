@@ -13,7 +13,8 @@ Note, this is specific for windows. you'd use export command on a Linux/Unix bas
 
 **Windows (on PowerShell)**
 ```powershell
-setx CATALOG_DB_DSN "{username}:{password}@tcp(localhost:3306)/catalog?parseTime=true"
+$echo $env:CATALOG_DB_DSN #Check if it's really there
+$env:CATALOG_DB_DSN = "{username}:{password}@tcp(localhost:3306)/catalog?parseTime=true"
 ```
 **Linux/Unix (macOS) (bash/zsh shell)**
 
