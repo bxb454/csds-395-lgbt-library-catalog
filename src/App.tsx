@@ -4,7 +4,6 @@ import viteLogo from '/vite.svg'
 import './App.css'
 import BookDataTable from "./assets/BookDataTable.tsx";
 import LoginButton from "./assets/LoginButton.tsx";
-import LoginModal from "./assets/LoginModal.tsx";
 import AdminUserTable from "./assets/AdminUserTable.tsx";
 import { UserData } from "./assets/Types";
 import { sampleUsers, hasManagerAuth, hasEmployeeAuth, hasPatronAuth } from "./assets/sampleUsers";
@@ -42,17 +41,9 @@ function App() {
       <header className="app-header">
         <h1 className="app-title">LGBT Center Library Catalog</h1>
         <LoginButton
-          isLoggedIn={isLoggedIn}
-          onSignIn={handleSignInClick}
-          onSignOut={handleSignOut}
         />
       </header>
 
-      <LoginModal
-        isOpen={showLoginModal}
-        onClose={handleCloseModal}
-        onSignIn={handleSignIn}
-      />
 
 
       {/* Replace the above <LoginButton /> and <LoginModal /> w/
