@@ -1,5 +1,5 @@
 import React from 'react';
-import { UserData } from './Types';
+import type { UserData } from './Types';
 import { sampleUsers } from './sampleUsers';
 
 interface LoginModalProps {

@@ -1,36 +1,6 @@
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+  margin: 0;
+  padding: 0;
 }
 
 .card {
@@ -42,16 +12,15 @@
 }
 
 .login-button {
-  top: 1rem;
-  right: 1rem;
   padding: 0.5rem 1rem;
   background-color: black;
   color: white;
-  z-index: 1000;
   width: 110px;
-   &:hover {
-    background-color: gray; 
-  }
+  border: none;
+  cursor: pointer;
+}
+.login-button:hover {
+  background-color: gray;
 }
 
 .modal-overlay {
@@ -97,11 +66,11 @@
 
 .app-header {
   width: 100vw;
-  margin-left: calc(-50vw + 50%);  
+  margin-left: calc(-50vw + 50%);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: lightblue;
+  background-color: #003071;
   color: white;
   padding: 1rem 2rem;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -112,4 +81,8 @@
   margin: 0;
   font-size: 1.5rem;
   font-weight: 600;
+}
+
+.catalog-main {
+  margin-top: 32px;
 }
