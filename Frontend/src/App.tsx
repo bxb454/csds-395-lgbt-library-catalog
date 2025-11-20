@@ -1,98 +1,187 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
-import BookDataTable from "./assets/BookDataTable.tsx";
-import LoginButton from "./assets/LoginButton.tsx";
-import AdminUserTable from "./assets/AdminUserTable.tsx";
-import { UserData } from "./assets/Types";
-import { sampleUsers, hasManagerAuth, hasEmployeeAuth, hasPatronAuth } from "./assets/sampleUsers";
+import { useState } from "react"
+import "./App.css"
+import BookDataTable from "./assets/BookDataTable.tsx"
+import CatalogHeader from "./assets/CatalogHeader.tsx"
+import type { UserData } from "./assets/Types.ts"
+import type { SearchOption } from "./assets/catalogSearch.ts"
+
+import MyLoansTable from "./assets/MyLoansTable.tsx"
+import AllLoansTable from "./assets/AllLoansTable.tsx"
+import LoanActionPopup from "./assets/LoanActionPopup.tsx"
+import UpdateCatalogTable from "./assets/UpdateCatalogTable.tsx"
+
+import type { BookData, LoanRecord } from "./assets/Types.ts"
+import { fakeBookData1, loans as fakeLoans } from "./assets/fake_data.tsx"
+import { sampleUsers } from "./assets/sampleUsers.tsx"
 
 function App() {
-  const [count, setCount] = useState(0)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [showLoginModal, setShowLoginModal] = useState(false)
   const [currentUser, setCurrentUser] = useState<UserData | null>(null)
 
+  const [books, setBooks] = useState<BookData[]>(fakeBookData1)
+  const [loans] = useState<LoanRecord[]>(fakeLoans)
 
+  const [currentPage, setCurrentPage] = useState<
+    "catalog" | "myloans" | "allloans" | "updatecatalog" | "staffroles"
+  >("catalog")
 
-  const handleSignInClick = () => {
-    setShowLoginModal(true)
-  }
+  const [searchBy, setSearchBy] = useState<SearchOption>("general")
+  const [searchText, setSearchText] = useState("")
 
-  const handleSignIn = (user: UserData) => {
-    setCurrentUser(user)
+  const [popupData, setPopupData] = useState<{
+    mode: "renew" | "return"
+    title: string
+    renewalCount?: number
+  } | null>(null)
+
+  const handleLogin = () => {
+    setCurrentUser(sampleUsers[0] ?? null)
     setIsLoggedIn(true)
-    setShowLoginModal(false)
-  }
+  };
 
-  const handleSignOut = () => {
+  const handleLogout = () => {
     setCurrentUser(null)
     setIsLoggedIn(false)
-  }
-
-  const handleCloseModal = () => {
-    setShowLoginModal(false)
-  }
+  };
 
   return (
-
     <>
       <header className="app-header">
         <h1 className="app-title">LGBT Center Library Catalog</h1>
-        <LoginButton />
-
       </header>
 
+     {/* Temp debug login */}
+      <div style={{ margin: "1rem" }}>
+        <label style={{ marginRight: "10px", fontWeight: 600 }}>
+          Debug login:
+        </label>
 
-      {/* Replace the above <LoginButton /> and <LoginModal /> w/
-      
-      <LoginButton isLoggedIn={isLoggedIn} />
-  
-      const SERVICE_URL = encodeURIComponent('http://localhost:3000/auth/cas/callback')
-      const CAS_LOGIN = `https://login.case.edu/cas/login?service=${SERVICE_URL}`
-      const CAS_LOGOUT = 'https://login.case.edu/cas/logout'
+        <select
+          value={currentUser?.id ?? ""}
+          onChange={(e) => {
+            const value = e.target.value;
 
-    */}
+            if (value === "") {
+              setCurrentUser(null)
+              setIsLoggedIn(false)
+              return;
+            }
 
-      {currentUser && (
-        <div style={{ margin: '1rem 0', padding: '1rem', backgroundColor: '#f0f0f0', borderRadius: '4px' }}>
-          <strong>Logged in as:</strong> {currentUser.caseID} ({currentUser.role})
-        </div>
-      )}
+            const chosen =
+              sampleUsers.find((u) => u.id === Number(value)) || null
 
+            setCurrentUser(chosen)
+            setIsLoggedIn(true)
+          }}
+          style={{
+            padding: "6px",
+            fontSize: "14px",
+            border: "1px solid #777",
+          }}
+        >
+          <option value="">Log out</option>
 
-      <h2>Catalog</h2>
-      <p>Browse available books (public access)</p>
-      <BookDataTable></BookDataTable>
+          {sampleUsers.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.caseID} ({u.role})
+            </option>
+          ))}
+        </select>
+      </div>
 
-        {isLoggedIn && (
-            <>
-                <h2> Your Checkouts</h2>
-                <BookDataTable></BookDataTable>
-            </>
+      <CatalogHeader
+        searchBy={searchBy}
+        searchText={searchText}
+        onSearchByChange={setSearchBy}
+        onSearchTextChange={setSearchText}
+        isLoggedIn={isLoggedIn}
+        currentUser={currentUser}
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        onLogin={handleLogin}
+        onLogout={handleLogout}
+      />
 
+      <div className="catalog-main">
+        {currentPage === "catalog" && (
+          <BookDataTable
+            searchBy={searchBy}
+            searchText={searchText}
+            isLoggedIn={isLoggedIn}
+          />
         )}
 
-      {hasEmployeeAuth(currentUser) && (
-        <>
-          <h2> Editable Catalog (employee only)</h2>
-          Update database here.
-          <BookDataTable editable={true}></BookDataTable>
-        </>
+        {currentPage === "myloans" && (
+          <MyLoansTable
+            loans={loans}
+            books={books}
+            onRenew={(loan) => {
+              const book = books.find((b) => b.id === loan.bookId)
+              setPopupData({
+                mode: "renew",
+                title: book?.title ?? "",
+                renewalCount: loan.renewalCount ?? 0,
+              });
+            }}
+            onReturn={(loan) => {
+              const book = books.find((b) => b.id === loan.bookId)
+              setPopupData({
+                mode: "return",
+                title: book?.title ?? "",
+              });
+            }}
+          />
+        )}
+
+        {currentPage === "allloans" && (
+          <AllLoansTable
+            loans={loans}
+            users={sampleUsers}
+            books={books}
+            onRenew={(loan) => {
+              const book = books.find((b) => b.id === loan.bookId)
+              setPopupData({
+                mode: "renew",
+                title: book?.title ?? "",
+                renewalCount: loan.renewalCount ?? 0,
+              });
+            }}
+            onReturn={(loan) => {
+              const book = books.find((b) => b.id === loan.bookId)
+              setPopupData({
+                mode: "return",
+                title: book?.title ?? "",
+              });
+            }}
+            onRestrictToggle={(id, v) => {
+              console.log("Restrict user", id, v)
+            }}
+          />
+        )}
+
+        {currentPage === "updatecatalog" && (
+          <UpdateCatalogTable books={books} onBooksChange={setBooks} />
+        )}
+
+        {currentPage === "staffroles" && (
+          <div style={{ padding: "2rem" }}>[Staff Roles Placeholder]</div>
+        )}
+      </div>
+
+      {popupData && (
+        <LoanActionPopup
+          mode={popupData.mode}
+          title={popupData.title}
+          renewalCount={popupData.renewalCount}
+          onSubmit={() => {
+            alert(`${popupData.mode} submitted for ${popupData.title}`)
+            setPopupData(null);
+          }}
+          onClose={() => setPopupData(null)}
+        />
       )}
-
-
-      {hasManagerAuth(currentUser) && (
-        <>
-          <h2>Users (admin view only)</h2>
-          <AdminUserTable></AdminUserTable>
-        </>
-      )}
-
-
     </>
-  )
+  );
 }
 
 export default App

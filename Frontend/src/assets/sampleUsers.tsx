@@ -1,4 +1,4 @@
-import { UserData } from './Types';
+import type { UserData } from './Types';
 
 export const sampleUsers: UserData[] = [
   {
@@ -10,13 +10,13 @@ export const sampleUsers: UserData[] = [
   {
     id: 2,
     caseID: "emp23", 
-    role: "employee",
+    role: "staff",
     isRestricted: false
   },
   {
     id: 3,
     caseID: "man89",
-    role: "manager",
+    role: "admin",
     isRestricted: false
   }
 ];
@@ -25,14 +25,14 @@ export const getSampleUser = (caseID: string): UserData | undefined => {
   return sampleUsers.find(user => user.caseID === caseID);
 };
 
-export const hasManagerAuth = (user: UserData | null): boolean => {
-  return user?.role === "manager";
+export const hasAdminAuth = (user: UserData | null): boolean => {
+  return user?.role === "admin";
 };
 
-export const hasEmployeeAuth = (user: UserData | null): boolean => {
-  return user?.role === "employee" || user?.role === "manager";
+export const hasStaffAuth = (user: UserData | null): boolean => {
+  return user?.role === "staff" || user?.role === "admin";
 };
 
 export const hasPatronAuth = (user: UserData | null): boolean => {
-  return user?.role === "patron" || user?.role === "employee" || user?.role === "manager";
+  return user?.role === "patron" || user?.role === "staff" || user?.role === "admin";
 };
