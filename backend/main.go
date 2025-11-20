@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sync"
 
 	//"strings"
 
@@ -27,30 +28,56 @@ func main() {
 
 	command := os.Args[1]
 	os.Args = append(os.Args[:1], os.Args[2:]...)
+	//var apiSvr *api.Server
+
+	var wg sync.WaitGroup
 
 	switch command {
 	case "auth-server":
-		startAuthServer()
+		wg.Add(1)
+		go startAuthServer(&wg)
+		wg.Wait()
 	case "api-server":
-		startAPIServer()
+		//apiSvr = startAPIServer()
+		wg.Add(1)
+		go startAPIServer(&wg)
+		wg.Wait()
 	case "test-cas":
 		cas_test.RunCASServer("8080")
 	case "test-simple":
 		//runSimpleTest()
+	case "full-test":
+		wg.Add(2)
+		go startAuthServer(&wg)
+		go startAPIServer(&wg)
+		/*wg.Go(func() {
+			startAPIServer()
+		})
+		wg.Go(func() {
+			startAuthServer()
+		})*/
+		wg.Wait()
 	default:
 		log.Fatalf("Unknown command: %s", command)
 	}
+
+	//fmt.Println(apiSvr)
+	//apiSvr.handleSingleUser()
 }
 
-func startAuthServer() {
+func startAuthServer(wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	var port = flag.String("port", "8080", "Port for auth server")
 	flag.Parse()
 
 	fmt.Printf("Starting CAS authentication server on port %s...\n", *port)
-	//cas_test.RunCASServer(*port)
+	cas_test.RunCASServer(*port)
 }
 
-func startAPIServer() {
+func startAPIServer(wg *sync.WaitGroup) *api.Server {
+	defer wg.Done()
+
 	var port = flag.String("port", "8081", "Port for API server")
 	flag.Parse()
 
@@ -64,6 +91,8 @@ func startAPIServer() {
 	if err := srv.Serve(addr); err != nil {
 		log.Fatalf("API server exited: %v", err)
 	}
+
+	return srv
 }
 
 /*

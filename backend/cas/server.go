@@ -56,6 +56,9 @@ func RunCASServer(port string) {
 		cas_auth.RedirectToLogin(w, r)
 		user := cas_auth.Username(r)
 		fmt.Println(user)
+		resp, _ := http.Get("http://lgbt-cat.case.edu/users/" + user)
+		fmt.Println(resp)
+		fmt.Println(resp.Body)
 		/*cas_url, _ := url.Parse("httpd://lgbt-cat.case.edu" + r.URL.String())
 		query := cas_url.RawQuery
 		//fmt.Println(query)
@@ -67,7 +70,7 @@ func RunCASServer(port string) {
 
 	// Create CAS client middleware
 	casURL, _ := url.Parse("https://login.case.edu/cas?ticket=ST-3555-McPZ4NKfx6S0EhnCEkHc")
-	fmt.Println(casURL.RawQuery)
+	//fmt.Println(casURL.RawQuery)
 	client := cas_auth.NewClient(&cas_auth.Options{
 		URL: casURL,
 	})
