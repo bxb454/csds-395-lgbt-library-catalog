@@ -165,6 +165,28 @@ Content-Type: application/json
 DELETE /books/{bookID}/authors/{authID}
 ```
 
+#### **How to Navigate Pages**
+
+**First Page (Page 1):**
+```http
+GET /books?limit=10&offset=0
+```
+
+**Second Page (Page 2):**
+```http
+GET /books?limit=10&offset=10
+```
+
+**Third Page (Page 3):**
+```http
+GET /books?limit=10&offset=20
+```
+
+**Page N:**
+```http
+GET /books?limit=10&offset={(N-1) * limit}
+```
+
 
 ### **Book-Tag Relationships**
 
@@ -239,7 +261,7 @@ GET /tags
 
 ### **Users**
 
-#### List Users
+#### List Users (0-10)
 ```http
 GET /users?limit=10&offset=0
 ```
@@ -447,7 +469,7 @@ await axios.delete(`${API_BASE}/books/1000`);
 //checkout a book
 await axios.post(`${API_BASE}/loans`, {
   bookID: 1001,
-  caseID: "U1234567",
+  caseID: "abc123",
   loanDate: "2025-10-17",
   dueDate: "2025-10-31",
   numRenewals: 0
@@ -640,5 +662,5 @@ If you're running the frontend on a different port, you may need to configure CO
 
 
 ## Contributors
-- Boris Brondz (Books, Users, Search, Tags)
-- Daniel Burwell (Authors, Loans)
+- Boris Brondz (Books, Users, Search, Tags, Integration Tests)
+- Daniel Burwell (Authors, Loans, CAS Authentication)

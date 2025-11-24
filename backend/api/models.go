@@ -9,6 +9,13 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// Set the test rate limit bursts/intervals for the rate limiter. I might've thought that some errors caused during testing
+// Were caused by
+func (s *Server) SetTestMode() {
+	s.rateInterval = time.Second
+	s.rateBurst = 100
+}
+
 type book struct {
 	ID          int     `json:"id"`
 	ISBN        *string `json:"isbn"`
@@ -55,7 +62,7 @@ type BookFilters struct {
 }
 
 type Server struct {
-	db           *sql.DB
+	Db           *sql.DB
 	router       *http.ServeMux
 	limiters     map[string]*rate.Limiter
 	limitMu      sync.Mutex
