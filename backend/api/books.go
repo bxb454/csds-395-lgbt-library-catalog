@@ -124,23 +124,31 @@ func (s *Server) HandleBookByID() http.Handler {
 		path := strings.TrimPrefix(r.URL.Path, "/books/")
 		parts := strings.Split(path, "/")
 
-		if len(parts) < 2 {
-			http.NotFound(w, r)
+		if len(parts) == 0 || parts[0] == "" {
+			http.Error(w, "missing book ID", http.StatusBadRequest)
 			return
 		}
 
 		//parts[0] always bookID, parts[1] is relation type
 		bookID := parts[0]
-		relation := parts[1]
+		//relation := parts[1]
 
-		switch relation {
-		case "authors":
-			s.HandleBookAuthors(w, r, bookID)
-		case "tags":
-			s.HandleBookTags(w, r, bookID)
-		default:
-			http.NotFound(w, r)
+		if len(parts) == 2 {
+			relation := parts[1]
+			switch relation {
+			case "authors":
+				s.HandleBookAuthors(w, r, bookID)
+				return
+			case "tags":
+				s.HandleBookTags(w, r, bookID)
+				return //let's return after handling the relationship
+			default:
+				http.NotFound(w, r)
+				return
+			}
 		}
+
+		//GET/PUT/DELETE logic was here but unreachable because of returning early
 
 		id := path
 		if id == "" {

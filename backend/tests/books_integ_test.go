@@ -146,21 +146,24 @@ func TestBooksGetSingle(t *testing.T) {
 
 	if resp.StatusCode != http.StatusOK {
 		bodyBytes, _ := io.ReadAll(resp.Body)
+		//t.Logf("Response Body: %s", string(bodyBytes))
 		t.Fatalf("Expected status 200, got %d. Body: %s", resp.StatusCode, string(bodyBytes))
 	}
 
 	type Book struct {
-		BookID    int    `json:"bookID"`
+		BookID    int    `json:"id"`
 		Title     string `json:"title"`
 		Copies    int    `json:"copies"`
 		Publisher string `json:"publisher"`
 	}
 
 	bodyBytes, err := io.ReadAll(resp.Body)
+	t.Logf("Book Single Response Body: %s", string(bodyBytes))
 	if err != nil {
 		t.Fatalf("Failed to read response body: %v", err)
 	}
 	book := decodeJSONResponse[Book](t, bodyBytes)
+	t.Logf("Specific Book Response: %+v", book)
 
 	if book.BookID != 1000 {
 		t.Errorf("Expected bookID 1000, got %d", book.BookID)
