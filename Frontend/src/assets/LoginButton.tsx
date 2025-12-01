@@ -1,23 +1,40 @@
-import React from 'react';
+import React from 'react'
 
-interface LoginButtonProps {
-  isLoggedIn: boolean;
-  onSignIn: () => void;
-  onSignOut: () => void;
-}
+/*
+const CAS_LOGIN_URL =
+  'https://login.case.edu/cas/login?service=http://lgbt-cat.case.edu
+  */
 
-const LoginButton: React.FC<LoginButtonProps> = ({ isLoggedIn, onSignIn, onSignOut }) => {
-  return (
-    <button
-      onClick={isLoggedIn ? onSignOut : onSignIn}
-      className="login-button"
-    >
-      {isLoggedIn ? 'Sign Out' : 'Sign In'}
-    </button>
-  );
+type LoginButtonProps = {
+  isLoggedIn: boolean
+  onLogin: () => void
+  onLogout: () => void
 };
 
-export default LoginButton;
+//const LoginButton: React.FC = () => {
+const LoginButton: React.FC<LoginButtonProps> = ({
+  isLoggedIn,
+  onLogin,
+  onLogout,
+}) => {
+  const handleLogin = () => {
+    onLogin()
+    // window.location.replace(CAS_LOGIN_URL);
+  };
+
+  return (
+    <button
+      // onClick={handleLogin}
+      onClick={isLoggedIn ? onLogout : handleLogin}
+      className="login-button"
+    >
+      {isLoggedIn ? "Logout" : "Login"}
+    </button>
+  )
+}
+
+export default LoginButton
+
 
 /*Future CAS SSO implementation
 import React from 'react';
