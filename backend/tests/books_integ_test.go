@@ -3,6 +3,7 @@ package tests
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"testing"
@@ -171,4 +172,64 @@ func TestBooksGetSingle(t *testing.T) {
 	if book.Title != "Twilight Reflections" {
 		t.Errorf("Expected title 'Twilight Reflections', got '%s'", book.Title)
 	}
+}
+
+func TestBooksDelete(t *testing.T) {
+	srv := newAPIServer(t)
+	defer srv.Close()
+
+	//Let's create a new book to delete
+	payload := map[string]any{
+		"isbn":        "9780987654321",
+		"title":       "Book To Delete",
+		"pubdate":     "2022-01-01",
+		"publisher":   "Delete Publisher",
+		"edition":     "1st",
+		"copies":      2,
+		"loanMetrics": 0,
+	}
+
+	body, _ := json.Marshal(payload)
+	resp, err := http.Post(srv.URL+"/api/v1/books", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("Failed to make create request: %v", err)
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		t.Fatalf("Expected status 201, got %d. Body: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	//we need to delete what we made
+	type CreateResponse struct {
+		ID int64 `json:"id"`
+	}
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("Failed to read create response body: %v", err)
+	}
+	response := decodeJSONResponse[CreateResponse](t, bodyBytes)
+	t.Logf("Created book to delete with ID: %d", response.ID)
+	//Now delete it
+	deleteURL := fmt.Sprintf("%s/api/v1/books/%d", srv.URL, response.ID)
+	req, err := http.NewRequest(http.MethodDelete, deleteURL, nil)
+	if err != nil {
+		t.Fatalf("Failed to create delete request: %v", err)
+	}
+
+	delResp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Logf("Delete Response: %+v", delResp)
+		t.Fatalf("Failed to delete book: %v", err)
+	}
+	defer delResp.Body.Close()
+
+	if delResp.StatusCode != http.StatusNoContent {
+		bodyBytes, _ := io.ReadAll(delResp.Body)
+		t.Fatalf("Expected status 204, got %d. Body: %s", delResp.StatusCode, string(bodyBytes))
+	}
+
 }
