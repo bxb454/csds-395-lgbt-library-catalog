@@ -299,12 +299,12 @@ function App() {
 
   return (
     <>
-      <header className="app-header">
+      <header className="app-header" style={{ padding: "24px 16px" }}>
         <h1 className="app-title">LGBT Center Library Catalog</h1>
       </header>
 
      {/* Temp debug login */}
-      <div style={{ margin: "1rem" }}>
+      <div style={{ margin: "1rem", display: "none" }}>
         <label style={{ marginRight: "10px", fontWeight: 600 }}>
           Debug login:
         </label>

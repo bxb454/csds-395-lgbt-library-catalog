@@ -17,7 +17,10 @@ import {
     fetchBookTags,
     deleteBookAuthor,
     deleteBookTag,
+    addBookAuthor,
+    addBookTag,
 } from "../api/books"
+import { fetchAuthors, createAuthor, type Author } from "../api/authors"
 
 type EditFormState = {
     id: number
@@ -66,7 +69,17 @@ const BookDataTable = ({
     const [editForm, setEditForm] = useState<EditFormState | null>(null)
     const [authorsByBook, setAuthorsByBook] = useState<Record<number, string>>({})
     const [tagsByBook, setTagsByBook] = useState<Record<number, string[]>>({})
-
+    const [pendingDelete, setPendingDelete] = useState<BookData | null>(null)
+    const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
+    const parseAuthorName = (raw: string): { fname?: string; lname: string } => {
+        const parts = raw.split(/\s+/).filter(Boolean)
+        if (parts.length <= 1) {
+            return { lname: parts[0] ?? raw }
+        }
+        const lname = parts.pop() ?? ""
+        const fname = parts.join(" ")
+        return { fname: fname || undefined, lname }
+    }
     const columns = useMemo<MRT_ColumnDef<BookData>[]>(
         () => [
             {
@@ -188,23 +201,23 @@ const BookDataTable = ({
         if (missing.length === 0) return
 
         const fetchAll = async () => {
-            const entries = await Promise.all(
-                missing.map(async (book) => {
-                    try {
-                        const authors = await fetchBookAuthors(book.id)
-                        const names = Array.isArray(authors)
-                            ? authors
-                                  .map((a: { fname?: string | null; lname?: string | null }) =>
-                                      [a.fname, a.lname].filter(Boolean).join(" ").trim(),
-                                  )
-                                  .filter((name: string) => name.length > 0)
-                            : []
-                        return [book.id, names.join(", ")] as const
-                    } catch {
-                        return [book.id, ""] as const
-                    }
-                }),
-            )
+            const entries: Array<[number, string]> = []
+            for (const book of missing) {
+                try {
+                    const authors = await fetchBookAuthors(book.id)
+                    const names = Array.isArray(authors)
+                        ? authors
+                              .map((a: { fname?: string | null; lname?: string | null }) =>
+                                  [a.fname, a.lname].filter(Boolean).join(" ").trim(),
+                              )
+                              .filter((name: string) => name.length > 0)
+                        : []
+                    entries.push([book.id, names.join(", ")])
+                } catch {
+                    entries.push([book.id, ""])
+                }
+                await sleep(50)
+            }
             setAuthorsByBook((prev) => {
                 const next = { ...prev }
                 for (const [id, names] of entries) {
@@ -227,17 +240,17 @@ const BookDataTable = ({
         if (missing.length === 0) return
 
         const fetchAll = async () => {
-            const entries: Array<[number, string[]]> = await Promise.all(
-                missing.map(async (book) => {
-                    try {
-                        const tags = await fetchBookTags(book.id)
-                        const safeTags = Array.isArray(tags) ? [...tags] : []
-                        return [book.id, safeTags]
-                    } catch {
-                        return [book.id, []]
-                    }
-                }),
-            )
+            const entries: Array<[number, string[]]> = []
+            for (const book of missing) {
+                try {
+                    const tags = await fetchBookTags(book.id)
+                    const safeTags = Array.isArray(tags) ? [...tags] : []
+                    entries.push([book.id, safeTags])
+                } catch {
+                    entries.push([book.id, []])
+                }
+                await sleep(50)
+            }
             setTagsByBook((prev) => {
                 const next: Record<number, string[]> = { ...prev }
                 for (const [id, tags] of entries) {
@@ -290,13 +303,15 @@ const BookDataTable = ({
         reader.readAsDataURL(file)
     }
 
-    const handleDeleteRow = async (row: any, event?: MouseEvent) => {
+    const handleDeleteRow = (row: any, event?: MouseEvent) => {
         event?.stopPropagation()
-        if (!window.confirm("Are you sure you want to delete this book?")) {
-            return
-        }
+        setPendingDelete(row.original)
+    }
+
+    const confirmDelete = async () => {
+        if (!pendingDelete) return
         try {
-            const bookId = row.original.id
+            const bookId = pendingDelete.id
             try {
                 const [authorsRaw, tagsRaw] = await Promise.all([
                     fetchBookAuthors(bookId).catch(() => null),
@@ -322,6 +337,7 @@ const BookDataTable = ({
 
             await deleteBook(bookId)
             await onRefreshBooks()
+            setPendingDelete(null)
         } catch (err) {
             console.error(err)
             alert("Failed to delete book. Please try again.")
@@ -346,6 +362,84 @@ const BookDataTable = ({
         edition: form.edition || undefined,
     })
 
+    const reconcileAuthors = async (bookId: number, authorInput: string) => {
+        const desiredNames = authorInput
+            .split(",")
+            .map((name) => name.trim())
+            .filter((name) => name.length > 0)
+
+        const allAuthors = await fetchAuthors().catch(() => [] as Author[])
+        const desiredIds: number[] = []
+
+        for (const name of desiredNames) {
+            const match = allAuthors.find((a) => {
+                const full = [a.fname, a.lname].filter(Boolean).join(" ").trim().toLowerCase()
+                return full === name.toLowerCase()
+            })
+            if (match) {
+                desiredIds.push(match.authID)
+                continue
+            }
+            try {
+                const parsed = parseAuthorName(name)
+                await createAuthor(parsed.lname, parsed.fname)
+                const refreshed = await fetchAuthors().catch(() => [] as Author[])
+                const created = refreshed.find((a) => {
+                    const full = [a.fname, a.lname].filter(Boolean).join(" ").trim().toLowerCase()
+                    return full === name.toLowerCase()
+                })
+                if (created) {
+                    desiredIds.push(created.authID)
+                }
+            } catch (err) {
+                console.error("Failed to create author", err)
+            }
+        }
+
+        const current = await fetchBookAuthors(bookId).catch(() => [] as any[])
+        const currentIds = current.map((a: any) => a.authID)
+
+        for (const id of currentIds) {
+            if (!desiredIds.includes(id)) {
+                await deleteBookAuthor(bookId, id).catch(() => {})
+                await sleep(30)
+            }
+        }
+        for (const id of desiredIds) {
+            if (!currentIds.includes(id)) {
+                await addBookAuthor(bookId, id).catch(() => {})
+                await sleep(30)
+            }
+        }
+    }
+
+    const reconcileTags = async (bookId: number, tagsInput: string, genre: string) => {
+        const desired = [
+            ...tagsInput
+                .split(",")
+                .map((tag) => tag.trim())
+                .filter((tag) => tag.length > 0),
+        ]
+        if (genre) {
+            desired.push(genre.trim())
+        }
+
+        const current = await fetchBookTags(bookId).catch(() => [] as string[])
+
+        for (const tag of current) {
+            if (!desired.includes(tag)) {
+                await deleteBookTag(bookId, tag).catch(() => {})
+                await sleep(30)
+            }
+        }
+        for (const tag of desired) {
+            if (!current.includes(tag)) {
+                await addBookTag(bookId, tag).catch(() => {})
+                await sleep(30)
+            }
+        }
+    }
+
     const handleEditSave = async () => {
         if (!editForm) return
 
@@ -369,6 +463,8 @@ const BookDataTable = ({
 
         try {
             await updateBook(editForm.id, buildWritePayload(editForm, copies))
+            await reconcileAuthors(editForm.id, editForm.author)
+            await reconcileTags(editForm.id, editForm.tagsInput, editForm.genre)
             await onRefreshBooks()
             setEditForm(null)
         } catch (err) {
@@ -474,13 +570,36 @@ const BookDataTable = ({
             </Box>
 
             {selectedBook && (
-            <BookDetailPopup
+                <BookDetailPopup
                     book={selectedBook}
                     isLoggedIn={isLoggedIn}
                     patronCaseID={currentUserCaseID}
                     onClose={() => setSelectedBook(null)}
                     onLoanCreated={onLoanCreated}
                 />
+            )}
+
+            {pendingDelete && (
+                <div className="modal-overlay">
+                    <div className="modal" style={{ maxWidth: 420 }}>
+                        <h3 style={{ marginTop: 0 }}>Delete Book</h3>
+                        <p style={{ marginBottom: 20 }}>
+                            Are you sure you want to delete{" "}
+                            <strong>{pendingDelete.title}</strong>?
+                        </p>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
+                            <button
+                                className="staff-roles-reset"
+                                onClick={() => setPendingDelete(null)}
+                            >
+                                Cancel
+                            </button>
+                            <button className="staff-roles-submit" onClick={confirmDelete}>
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {editForm && (
@@ -545,21 +664,6 @@ const BookDataTable = ({
                                 <input
                                     value={editForm.isbn}
                                     onChange={(e) => updateEditField("isbn", e.target.value)}
-                                />
-                            </label>
-                            <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
-                                Image URL
-                                <input
-                                    value={editForm.image}
-                                    onChange={(e) => updateEditField("image", e.target.value)}
-                                />
-                                <span style={{ fontSize: 11, marginTop: 6 }}>
-                                    or upload a PNG/JPEG:
-                                </span>
-                                <input
-                                    type="file"
-                                    accept="image/png,image/jpeg,image/webp"
-                                    onChange={handleImageUpload}
                                 />
                             </label>
                             <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>

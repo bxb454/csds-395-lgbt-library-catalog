@@ -51,6 +51,7 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [authors, setAuthors] = useState<Author[]>([])
+  const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
   const [newBook, setNewBook] = useState({
     title: "",
     author: "",
@@ -241,25 +242,25 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
       const newId = await createBook(payload)
 
       if (newId) {
-        await Promise.all([
-          ...tagInput.map((tag) =>
-            addBookTag(newId, tag).catch((err) => {
-              console.error("Failed to add tag", err)
-              throw new Error(`Failed to add tag "${tag}"`)
-            }),
-          ),
-          ...matchedAuthors.map((author) =>
-            addBookAuthor(newId, author.authID).catch((err) => {
-              console.error("Failed to link author", err)
-              throw new Error(
-                `Failed to link author ${[author.fname, author.lname]
-                  .filter(Boolean)
-                  .join(" ")
-                  .trim()}`,
-              )
-            }),
-          ),
-        ])
+        for (const tag of tagInput) {
+          await addBookTag(newId, tag).catch((err) => {
+            console.error("Failed to add tag", err)
+            throw new Error(`Failed to add tag "${tag}"`)
+          })
+          await sleep(50)
+        }
+        for (const author of matchedAuthors) {
+          await addBookAuthor(newId, author.authID).catch((err) => {
+            console.error("Failed to link author", err)
+            throw new Error(
+              `Failed to link author ${[author.fname, author.lname]
+                .filter(Boolean)
+                .join(" ")
+                .trim()}`,
+            )
+          })
+          await sleep(50)
+        }
       }
       await onRefreshBooks()
       setError(null)
