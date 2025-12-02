@@ -53,6 +53,11 @@ func TestMain(m *testing.M) {
 		panic(fmt.Sprintf("failed to get the dummy script path: %v", err))
 	}
 
+	triggerPath, err := filepath.Abs("../../Database Schema/triggers.sql")
+	if err != nil {
+		panic(fmt.Sprintf("failed to get the trigger script path: %v", err))
+	}
+
 	//Start MySQL container with DDL and test data script (DML)
 	container, err := mysql.Run(ctx,
 		//Use this version as mentioned in Testcontainers docs for MySQL (Go)
@@ -61,7 +66,7 @@ func TestMain(m *testing.M) {
 		mysql.WithDatabase("testdb"),
 		mysql.WithUsername("testuser"),
 		mysql.WithPassword("testpass"),
-		mysql.WithScripts(schemaPath, dummyScriptPath),
+		mysql.WithScripts(schemaPath, dummyScriptPath, triggerPath),
 	)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to start container: %v", err))
