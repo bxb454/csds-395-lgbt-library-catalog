@@ -187,6 +187,8 @@ GET /books?limit=10&offset=20
 GET /books?limit=10&offset={(N-1) * limit}
 ```
 
+**Sample Axios setup for a call with paginations and offset:
+
 
 ### **Book-Tag Relationships**
 

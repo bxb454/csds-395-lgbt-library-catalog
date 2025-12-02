@@ -10,7 +10,8 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
+
+	//"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -52,33 +53,6 @@ func parsePagination(r *http.Request) PaginationParams {
 	}
 
 	return params
-}
-
-// another helper function. move to bottom.
-func (bf BookFilters) buildWhereClause() (string, []any) {
-	var conditions []string
-	var args []any
-
-	if bf.Title != "" {
-		conditions = append(conditions, "title LIKE ?")
-		args = append(args, "%"+bf.Title+"%")
-	}
-	if bf.ISBN != "" {
-		conditions = append(conditions, "isbn = ?")
-		args = append(args, bf.ISBN)
-	}
-	if bf.Publisher != "" {
-		conditions = append(conditions, "publisher LIKE ?")
-		args = append(args, "%"+bf.Publisher+"%")
-	}
-
-	//join conditions with " AND " and prepend "WHERE" if there are any conditions
-	whereClause := ""
-	if len(conditions) > 0 {
-		whereClause = " WHERE " + strings.Join(conditions, " AND ")
-	}
-
-	return whereClause, args
 }
 
 func New() (*Server, error) {
