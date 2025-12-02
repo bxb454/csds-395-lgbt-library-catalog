@@ -1,11 +1,9 @@
 import {
   MaterialReactTable,
   type MRT_ColumnDef,
-  type MRT_Row,
   useMaterialReactTable,
 } from "material-react-table"
-import { Box, Button, IconButton } from "@mui/material"
-import { Delete, Edit } from "@mui/icons-material"
+import { Box, Button } from "@mui/material"
 import { useEffect, useMemo, useState } from "react"
 import type { BookData } from "./Types"
 import { fakeBookData1 } from "./fake_data"
@@ -13,10 +11,6 @@ import { fakeBookData1 } from "./fake_data"
 type UpdateCatalogTableProps = {
   books?: BookData[]
   onBooksChange?: (updated: BookData[]) => void
-}
-
-type EditableBook = BookData & {
-  tags?: string | string[]
 }
 
 const parseTags = (value: unknown): string[] => {
@@ -104,52 +98,10 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
     },
   ], [])
 
-  const handleDeleteRow = (row: MRT_Row<BookData>) => {
-    if (!window.confirm(`Remove "${row.original.title}" from catalog?`)) {
-      return
-    }
-
-    updateData(data.filter((_, idx) => idx !== row.index))
-  }
-
-const normalizeValues = (values: EditableBook, existing: BookData): BookData => {
-    const normalized: BookData = {
-      ...existing,
-      ...values,
-      copies: numberOrDefault(values.copies, existing.copies),
-      available: numberOrDefault(values.available, existing.available),
-      tags: parseTags(values.tags ?? existing.tags ?? []),
-    }
-
-    if (normalized.available > normalized.copies) {
-      normalized.available = normalized.copies
-    }
-
-    return normalized
-  }
-
   const table = useMaterialReactTable({
     columns,
     data,
-    enableEditing: true,
-    renderRowActions: ({ row, table }) => (
-      <Box sx={{ display: "flex", gap: 1 }}>
-        <IconButton
-          size="small"
-          color="primary"
-          onClick={() => table.setEditingRow(row)}
-        >
-          <Edit fontSize="small" />
-        </IconButton>
-        <IconButton
-          size="small"
-          color="error"
-          onClick={() => handleDeleteRow(row)}
-        >
-          <Delete fontSize="small" />
-        </IconButton>
-      </Box>
-    ),
+    enableEditing: false,
     renderTopToolbarCustomActions: ({ table }) => (
       <Button
         variant="contained"
@@ -180,14 +132,6 @@ const normalizeValues = (values: EditableBook, existing: BookData): BookData => 
 
       updateData([...data, newBook])
       table.setCreatingRow(null)
-    },
-    onEditingRowSave: async ({ values, row, table }) => {
-      const updated = normalizeValues(values, row.original)
-      const next = data.map((book, idx) =>
-        idx === row.index ? updated : book
-      )
-      updateData(next)
-      table.setEditingRow(null)
     },
     muiTableBodyRowProps: { sx: { height: 72 } },
     muiTableBodyCellProps: {

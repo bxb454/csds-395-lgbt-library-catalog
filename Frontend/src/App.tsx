@@ -9,6 +9,7 @@ import MyLoansTable from "./assets/MyLoansTable.tsx"
 import AllLoansTable from "./assets/AllLoansTable.tsx"
 import LoanActionPopup from "./assets/LoanActionPopup.tsx"
 import UpdateCatalogTable from "./assets/UpdateCatalogTable.tsx"
+import StaffRolesTable from "./assets/StaffRolesTable.tsx"
 
 import type { BookData, LoanRecord } from "./assets/Types.ts"
 import { fakeBookData1, loans as fakeLoans } from "./assets/fake_data.tsx"
@@ -33,6 +34,10 @@ function App() {
     title: string
     renewalCount?: number
   } | null>(null)
+
+  const userRole = currentUser?.role ?? "patron"
+  const canManageCatalog =
+    userRole === "staff" || userRole === "admin"
 
   const handleLogin = () => {
     setCurrentUser(sampleUsers[0] ?? null)
@@ -108,6 +113,7 @@ function App() {
             searchBy={searchBy}
             searchText={searchText}
             isLoggedIn={isLoggedIn}
+            canManage={canManageCatalog}
           />
         )}
 
@@ -163,9 +169,7 @@ function App() {
           <UpdateCatalogTable books={books} onBooksChange={setBooks} />
         )}
 
-        {currentPage === "staffroles" && (
-          <div style={{ padding: "2rem" }}>[Staff Roles Placeholder]</div>
-        )}
+        {currentPage === "staffroles" && <StaffRolesTable />}
       </div>
 
       {popupData && (
