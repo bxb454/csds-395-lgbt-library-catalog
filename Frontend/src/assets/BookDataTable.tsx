@@ -3,7 +3,7 @@ import {
     type MRT_ColumnDef,
     useMaterialReactTable,
 } from "material-react-table"
-import { useMemo, useState, type MouseEvent } from "react"
+import { useEffect, useMemo, useState, type MouseEvent } from "react"
 import { Box, IconButton } from "@mui/material"
 import { Delete, Edit } from "@mui/icons-material"
 import type { BookData } from "./Types"
@@ -62,6 +62,8 @@ const BookDataTable = ({
     const [selectedBook, setSelectedBook] = useState<BookData | null>(null)
     const allowManagement = editable || canManage
     const [editForm, setEditForm] = useState<EditFormState | null>(null)
+    const [authorsByBook, setAuthorsByBook] = useState<Record<number, string>>({})
+    const [tagsByBook, setTagsByBook] = useState<Record<number, string[]>>({})
 
     const columns = useMemo<MRT_ColumnDef<BookData>[]>(
         () => [
@@ -115,6 +117,10 @@ const BookDataTable = ({
                 size: 260,
                 Cell: ({ row }) => {
                     const book = row.original
+                    const authorLine =
+                        authorsByBook[book.id] ??
+                        book.author ??
+                        ""
                     return (
                         <div style={{ display: "flex", flexDirection: "column" }}>
                             <div
@@ -126,7 +132,7 @@ const BookDataTable = ({
                             >
                                 {book.title}
                             </div>
-                            <div style={{ fontSize: 11 }}>{book.author}</div>
+                            <div style={{ fontSize: 11 }}>{authorLine}</div>
                         </div>
                     )
                 },
@@ -139,9 +145,13 @@ const BookDataTable = ({
                     const book = row.original
                     const copiesLabel = book.copies === 1 ? "copy" : "copies"
 
+                    const tagsList =
+                        tagsByBook[book.id] && tagsByBook[book.id].length > 0
+                            ? tagsByBook[book.id]
+                            : book.tags
                     const tagsText =
-                        (book.tags && book.tags.length > 0
-                            ? book.tags.join(", ")
+                        (tagsList && tagsList.length > 0
+                            ? tagsList.join(", ")
                             : book.genre) || ""
 
                     return (
@@ -161,7 +171,7 @@ const BookDataTable = ({
                 },
             },
         ],
-        []
+        [authorsByBook]
     )
 
     const filteredData = useMemo(
@@ -169,20 +179,95 @@ const BookDataTable = ({
         [books, searchBy, searchText],
     )
 
-    const createEditState = (book: BookData): EditFormState => ({
-        id: book.id,
-        title: book.title ?? "",
-        author: book.author ?? "",
-        genre: book.genre ?? "",
-        publisher: book.publisher ?? "",
-        edition: book.edition ?? "",
-        image: book.image ?? "",
-        pubYear: book.pubYear ? String(book.pubYear) : "",
-        isbn: book.isbn ? String(book.isbn) : "",
-        tagsInput: book.tags?.join(", ") ?? "",
-        copies: String(book.copies ?? 0),
-        available: String(book.available ?? 0),
-    })
+    useEffect(() => {
+        const missing = books.filter(
+            (b) => !authorsByBook[b.id] && (!b.author || b.author.length === 0),
+        )
+        if (missing.length === 0) return
+
+        const fetchAll = async () => {
+            const entries = await Promise.all(
+                missing.map(async (book) => {
+                    try {
+                        const authors = await fetchBookAuthors(book.id)
+                        const names = Array.isArray(authors)
+                            ? authors
+                                  .map((a: { fname?: string | null; lname?: string | null }) =>
+                                      [a.fname, a.lname].filter(Boolean).join(" ").trim(),
+                                  )
+                                  .filter((name: string) => name.length > 0)
+                            : []
+                        return [book.id, names.join(", ")] as const
+                    } catch {
+                        return [book.id, ""] as const
+                    }
+                }),
+            )
+            setAuthorsByBook((prev) => {
+                const next = { ...prev }
+                for (const [id, names] of entries) {
+                    if (names) next[id] = names
+                }
+                return next
+            })
+        }
+
+        void fetchAll()
+    }, [books, authorsByBook])
+
+    useEffect(() => {
+        const missing = books.filter(
+            (b) =>
+                !tagsByBook[b.id] &&
+                (!b.tags || b.tags.length === 0) &&
+                b.id !== undefined,
+        )
+        if (missing.length === 0) return
+
+        const fetchAll = async () => {
+            const entries: Array<[number, string[]]> = await Promise.all(
+                missing.map(async (book) => {
+                    try {
+                        const tags = await fetchBookTags(book.id)
+                        const safeTags = Array.isArray(tags) ? [...tags] : []
+                        return [book.id, safeTags]
+                    } catch {
+                        return [book.id, []]
+                    }
+                }),
+            )
+            setTagsByBook((prev) => {
+                const next: Record<number, string[]> = { ...prev }
+                for (const [id, tags] of entries) {
+                    if (tags.length > 0) next[id] = [...tags]
+                }
+                return next
+            })
+        }
+
+        void fetchAll()
+    }, [books, tagsByBook])
+
+    const createEditState = (book: BookData): EditFormState => {
+        const authorName = authorsByBook[book.id] ?? book.author ?? ""
+        const tagsList = tagsByBook[book.id] ?? book.tags ?? []
+        const genreValue = book.genre ?? (tagsList.length > 0 ? tagsList[0] : "")
+
+        return {
+            id: book.id,
+            title: book.title ?? "",
+            author: authorName,
+            genre: genreValue,
+            publisher: book.publisher ?? "",
+            edition: book.edition ?? "",
+            image: book.image ?? "",
+            pubYear: book.pubYear ? String(book.pubYear) : "",
+            isbn: book.isbn ? String(book.isbn) : "",
+            tagsInput: tagsList.join(", "),
+            copies: String(book.copies ?? 0),
+            available: String(book.available ?? 0),
+        }
+    }
 
     const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0]
@@ -387,7 +472,7 @@ const BookDataTable = ({
             </Box>
 
             {selectedBook && (
-                <BookDetailPopup
+            <BookDetailPopup
                     book={selectedBook}
                     isLoggedIn={isLoggedIn}
                     onClose={() => setSelectedBook(null)}

@@ -7,8 +7,8 @@ CREATE TRIGGER deleted_book
 BEFORE DELETE ON books
 FOR EACH ROW
 BEGIN
-		DELETE FROM bookauthor WHERE OLD.bookID = bookauthor.bookID;
-		DELETE FROM booktags WHERE OLD.bookID = bookauthor.bookID;
+		DELETE FROM bookauthor WHERE bookID = OLD.bookID;
+		DELETE FROM booktags WHERE bookID = OLD.bookID;
 END//
 
 DELIMITER //
@@ -17,6 +17,6 @@ AFTER DELETE ON bookauthor
 FOR EACH ROW
 BEGIN
 	IF NOT EXISTS (SELECT * FROM bookauthor WHERE authID = OLD.authID) THEN
-		DELETE FROM author WHERE authID = OLD.authID;
+		DELETE FROM authors WHERE authID = OLD.authID;
 	END IF;
 END//

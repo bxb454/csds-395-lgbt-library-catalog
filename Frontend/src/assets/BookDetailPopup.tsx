@@ -25,7 +25,6 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
   onLoanCreated,
 }) => {
   const [staffID, setStaffID] = useState("")
-  const [borrowerCaseID, setBorrowerCaseID] = useState("")
   const [authors, setAuthors] = useState<{ authID: number; name: string }[]>([])
   const [tags, setTags] = useState<string[]>(book.tags ?? [])
   const [availableAuthors, setAvailableAuthors] = useState<Author[]>([])
@@ -160,7 +159,7 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
   const formatDate = (date: Date) => date.toISOString().split("T")[0]
 
   const handleCheckout = async () => {
-    const patronCase = borrowerCaseID.trim()
+    const patronCase = (patronCaseID ?? "").trim()
     if (!patronCase) {
       setCheckoutError("Enter a patron CASE ID before checking out.")
       return
@@ -196,7 +195,7 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
         left: 0,
         width: "100vw",
         height: "100vh",
-        backgroundColor: "black",
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
@@ -237,58 +236,9 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
                     style={{ display: "flex", gap: 8, alignItems: "center" }}
                   >
                     <span>{author.name}</span>
-                    {isLoggedIn && (
-                      <button
-                        style={{ fontSize: 12, cursor: "pointer" }}
-                        onClick={() => handleDeleteAuthor(author.authID)}
-                      >
-                        remove
-                      </button>
-                    )}
                   </div>
                 ))
               : book.author || ""}
-            {isLoggedIn && authorOptions.length > 0 && (
-              <div style={{ marginTop: "10px" }}>
-                <select
-                  value={selectedAuthorId}
-                  onChange={(e) => setSelectedAuthorId(e.target.value)}
-                >
-                  <option value="">Add existing author</option>
-                  {authorOptions.map((author) => (
-                    <option key={author.authID} value={author.authID}>
-                      {[author.fname, author.lname].filter(Boolean).join(" ")}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  style={{ marginLeft: 8 }}
-                  onClick={handleAddAuthor}
-                  disabled={!selectedAuthorId}
-                >
-                  Add
-                </button>
-              </div>
-            )}
-            {isLoggedIn && (
-              <div style={{ marginTop: "10px" }}>
-                <div style={{ fontSize: 12, marginBottom: 4 }}>Create new author</div>
-                <input
-                  placeholder="Last name"
-                  value={newAuthorLName}
-                  onChange={(e) => setNewAuthorLName(e.target.value)}
-                  style={{ marginRight: 4 }}
-                />
-                <input
-                  placeholder="First name"
-                  value={newAuthorFName}
-                  onChange={(e) => setNewAuthorFName(e.target.value)}
-                  style={{ marginRight: 4 }}
-                />
-                <button onClick={handleCreateAuthor}>Create</button>
-                {pendingMessage && <div style={{ fontSize: 12 }}>{pendingMessage}</div>}
-              </div>
-            )}
           </div>
 
           <div style={{ marginBottom: "15px" }}>
@@ -328,35 +278,11 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
                 {tags.map((tag) => (
                   <li key={tag} style={{ marginBottom: 4 }}>
                     {tag}
-                    {isLoggedIn && (
-                      <button
-                        style={{ marginLeft: 8, fontSize: 12 }}
-                        onClick={() => handleDeleteTag(tag)}
-                      >
-                        remove
-                      </button>
-                    )}
                   </li>
                 ))}
               </ul>
             ) : (
               "No tags yet"
-            )}
-            {isLoggedIn && (
-              <div style={{ marginTop: 8 }}>
-                <input
-                  placeholder="Add tag"
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                />
-                <button
-                  style={{ marginLeft: 8 }}
-                  onClick={handleAddTag}
-                  disabled={!newTag.trim()}
-                >
-                  Add Tag
-                </button>
-              </div>
             )}
           </div>
           {metaError && (
@@ -378,18 +304,6 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
             <strong>Check out item?</strong>
 
             <div style={{ marginTop: "6px" }}>
-              Patron CASE ID:{" "}
-              <input
-                value={borrowerCaseID}
-                onChange={(e) => setBorrowerCaseID(e.target.value)}
-                placeholder="pat123"
-                style={{
-                  border: "1px solid #777",
-                  padding: "2px 4px",
-                  width: "140px",
-                  marginRight: "8px",
-                }}
-              />
               Processed by:{" "}
               <input
                 value={staffID}
@@ -420,12 +334,14 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
           <button
             onClick={onClose}
             style={{
-              fontSize: "20px",
-              color: "red",
-              background: "none",
-              border: "none",
+              fontSize: "16px",
+              padding: "10px 18px",
+              borderRadius: "8px",
+              border: "1px solid #c62828",
+              background: "white",
+              color: "#c62828",
               cursor: "pointer",
-              textDecoration: "underline",
+              minWidth: "120px",
             }}
           >
             Cancel
@@ -436,12 +352,14 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
               onClick={handleCheckout}
               disabled={checkoutLoading}
               style={{
-                fontSize: "20px",
-                color: checkoutLoading ? "gray" : "blue",
-                background: "none",
-                border: "none",
+                fontSize: "16px",
+                padding: "10px 18px",
+                borderRadius: "8px",
+                border: "1px solid #1976d2",
+                background: checkoutLoading ? "#e0e0e0" : "#1976d2",
+                color: checkoutLoading ? "#666" : "white",
                 cursor: checkoutLoading ? "not-allowed" : "pointer",
-                textDecoration: "underline",
+                minWidth: "120px",
               }}
             >
               {checkoutLoading ? "Submitting..." : "Submit"}

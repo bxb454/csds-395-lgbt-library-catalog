@@ -14,10 +14,31 @@ interface BackendBook {
   loanMetrics?: number
 }
 
-interface BackendAuthor {
-  authID: number
-  lname: string
-  fname?: string | null
+type BackendAuthor =
+  | {
+      authID: number
+      lname: string
+      fname?: string | null
+    }
+  | {
+      AuthID: number
+      LName: string
+      FName?: string | null
+    }
+
+const adaptAuthor = (author: BackendAuthor) => {
+  if ("AuthID" in author) {
+    return {
+      authID: author.AuthID,
+      lname: author.LName,
+      fname: author.FName,
+    }
+  }
+  return {
+    authID: author.authID,
+    lname: author.lname,
+    fname: author.fname,
+  }
 }
 
 export type BookFilters = Partial<{
@@ -70,7 +91,7 @@ const adaptBook = (book: BackendBook): BookData => {
     copies: book.copies,
     available,
     isbn: book.isbn ?? undefined,
-  pubYear:
+    pubYear:
       typeof pubYear === "number" && !Number.isNaN(pubYear) ? pubYear : undefined,
     publisher: book.publisher ?? undefined,
     edition: book.edition ?? undefined,
@@ -141,7 +162,10 @@ export async function fetchBookById(id: number): Promise<BookData> {
 
   try {
     const [authors, tags] = await Promise.all([
-      axios.get<BackendAuthor[]>(`${API_BASE}/books/${id}/authors`).then((res) => res.data).catch(() => []),
+      axios
+        .get<BackendAuthor[]>(`${API_BASE}/books/${id}/authors`)
+        .then((res) => res.data.map(adaptAuthor))
+        .catch(() => []),
       axios.get<string[]>(`${API_BASE}/books/${id}/tags`).then((res) => res.data).catch(() => []),
     ])
 
@@ -156,7 +180,7 @@ export async function fetchBookById(id: number): Promise<BookData> {
       author: authorNames.join(", "),
       tags: Array.isArray(tags) ? tags : [],
     }
-  } catch {
+} catch {
     return base
   }
 }
@@ -179,7 +203,7 @@ export async function fetchBookAuthors(id: number) {
   const response = await axios.get<BackendAuthor[]>(
     `${API_BASE}/books/${id}/authors`,
   )
-  return response.data
+  return (response.data ?? []).map(adaptAuthor)
 }
 
 export async function fetchBookTags(id: number) {

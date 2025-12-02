@@ -86,8 +86,8 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
       },
     },
     {
-      accessorKey: "available",
-      header: "Available",
+      accessorKey: "loanMetrics",
+      header: "Checked Out",
       muiTableBodyCellEditTextFieldProps: {
         type: "number",
         inputProps: { min: 0 },
