@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react"
+import axios from "axios"
 import type { BookData } from "./Types"
 import {
   addBookAuthor,
@@ -15,6 +16,7 @@ interface BookDetailPopupProps {
   book: BookData
   onClose: () => void
   isLoggedIn: boolean
+  patronCaseID?: string | null
   onLoanCreated?: () => Promise<void> | void
 }
 
@@ -22,6 +24,7 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
   book,
   onClose,
   isLoggedIn,
+  patronCaseID,
   onLoanCreated,
 }) => {
   const [staffID, setStaffID] = useState("")
@@ -161,7 +164,7 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
   const handleCheckout = async () => {
     const patronCase = (patronCaseID ?? "").trim()
     if (!patronCase) {
-      setCheckoutError("Enter a patron CASE ID before checking out.")
+      setCheckoutError("Log in to a patron account before checking out.")
       return
     }
     setCheckoutError(null)
@@ -181,7 +184,21 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
       onClose()
     } catch (err) {
       console.error(err)
-      setCheckoutError("Checkout failed. Verify the CASE ID and try again.")
+      if (axios.isAxiosError(err)) {
+        const data = err.response?.data
+        const serverMsg =
+          typeof data === "string"
+            ? data
+            : typeof data?.error === "string"
+              ? data.error
+              : null
+        setCheckoutError(
+          serverMsg ??
+            "Checkout failed. Ensure the patron exists and has permission.",
+        )
+      } else {
+        setCheckoutError("Checkout failed. Verify the CASE ID and try again.")
+      }
     } finally {
       setCheckoutLoading(false)
     }

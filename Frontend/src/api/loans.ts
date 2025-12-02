@@ -47,11 +47,12 @@ export async function createLoan(payload: {
   dueDate: string
   numRenewals?: number
 }) {
+  const toISO = (value: string) => new Date(value).toISOString()
   await axios.post(`${API_BASE}/loans`, {
     bookID: payload.bookID,
     caseID: payload.caseID,
-    loanDate: payload.loanDate,
-    dueDate: payload.dueDate,
+    loanDate: toISO(payload.loanDate),
+    dueDate: toISO(payload.dueDate),
     numRenewals: payload.numRenewals ?? 0,
   })
 }

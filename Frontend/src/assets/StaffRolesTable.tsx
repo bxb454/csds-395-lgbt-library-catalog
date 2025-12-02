@@ -8,9 +8,10 @@ interface RoleAssignment {
   id: number
   caseID: string
   role: RoleOption
+  isRestricted: boolean
 }
 
-const ROLE_OPTIONS: RoleOption[] = ["patron", "staff", "admin"]
+const ROLE_OPTIONS: RoleOption[] = ["staff", "admin"]
 
 const mapRole = (role?: string): RoleOption | null => {
   if (role === "staff") return "staff"
@@ -29,15 +30,20 @@ const buildAssignments = (users: UserData[]): RoleAssignment[] =>
         id: idx + 1,
         caseID: user.caseID,
         role: parsed,
+        isRestricted: Boolean(user.isRestricted),
       }
     })
     .filter((entry): entry is RoleAssignment => entry !== null)
 
 interface StaffRolesTableProps {
   users?: UserData[]
+  onSetRole?: (caseID: string, role: RoleOption) => Promise<void> | void
 }
 
-const StaffRolesTable: FC<StaffRolesTableProps> = ({ users = sampleUsers }) => {
+const StaffRolesTable: FC<StaffRolesTableProps> = ({
+  users = sampleUsers,
+  onSetRole = async () => {},
+}) => {
   const defaultAssignments = useMemo(
     () => buildAssignments(users),
     [users],
@@ -46,7 +52,7 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({ users = sampleUsers }) => {
     defaultAssignments,
   )
   const [caseIdInput, setCaseIdInput] = useState("")
-  const [roleInput, setRoleInput] = useState<RoleOption>("patron")
+  const [roleInput, setRoleInput] = useState<RoleOption>("staff")
   const [message, setMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -61,7 +67,7 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({ users = sampleUsers }) => {
       )
   }, [assignments])
 
-  const handleAssignRole = (event: FormEvent<HTMLFormElement>) => {
+  const handleAssignRole = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const trimmedCase = caseIdInput.trim()
 
@@ -77,11 +83,6 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({ users = sampleUsers }) => {
       )
 
       if (existingIndex >= 0) {
-        if (roleInput === "patron") {
-          feedback = `${trimmedCase} now uses default patron access.`
-          return prevAssignments.filter((_, idx) => idx !== existingIndex)
-        }
-
         const updated = [...prevAssignments]
         updated[existingIndex] = {
           ...updated[existingIndex],
@@ -90,11 +91,6 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({ users = sampleUsers }) => {
         }
         feedback = `Updated ${trimmedCase} to ${roleInput}.`
         return updated
-      }
-
-      if (roleInput === "patron") {
-        feedback = `${trimmedCase} already has patron access by default.`
-        return prevAssignments
       }
 
       const nextId =
@@ -112,18 +108,26 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({ users = sampleUsers }) => {
       return [...prevAssignments, created]
     })
 
-    setMessage(feedback)
+    try {
+      await onSetRole(trimmedCase, roleInput)
+      setMessage(feedback)
+    } catch (err) {
+      console.error(err)
+      setMessage("Failed to update role. Please try again.")
+    }
     setCaseIdInput("")
-    setRoleInput("patron")
+    setRoleInput("staff")
   }
 
-  const updateRole = (id: number, role: RoleOption) => {
+  const updateRole = async (id: number, role: RoleOption) => {
     let feedback = ""
+    let targetCaseID = ""
     setAssignments((prev) => {
       if (role === "patron") {
         return prev.filter((entry) => {
           if (entry.id === id) {
             feedback = `${entry.caseID} now uses default patron access.`
+            targetCaseID = entry.caseID
             return false
           }
           return true
@@ -133,14 +137,24 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({ users = sampleUsers }) => {
       return prev.map((entry) => {
         if (entry.id === id) {
           feedback = `Updated ${entry.caseID} to ${role}.`
+          targetCaseID = entry.caseID
           return { ...entry, role }
         }
         return entry
       })
     })
 
-    if (feedback) {
-      setMessage(feedback)
+    if (!targetCaseID) {
+      return
+    }
+    try {
+      await onSetRole(targetCaseID, role)
+      if (feedback) {
+        setMessage(feedback)
+      }
+    } catch (err) {
+      console.error(err)
+      setMessage("Failed to update role. Please try again.")
     }
   }
 
@@ -222,7 +236,7 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({ users = sampleUsers }) => {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={3} style={{ textAlign: "center" }}>
+                  <td colSpan={4} style={{ textAlign: "center" }}>
                     No assignments yet. Add a CASE ID to get started.
                   </td>
                 </tr>

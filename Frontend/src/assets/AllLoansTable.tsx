@@ -174,6 +174,7 @@ const AllLoansTable: React.FC<Props> = ({
                 py: 0.8,
                 px: 1,
                 "&:last-of-type": { borderRight: "none" },
+                "& img": { display: "block", margin: "0 auto" },
             },
         },
         muiTableHeadCellProps: {

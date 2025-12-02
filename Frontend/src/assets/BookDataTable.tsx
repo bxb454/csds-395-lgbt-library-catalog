@@ -45,6 +45,7 @@ interface BookTableProps {
     isLoggedIn: boolean
     canManage?: boolean
     onLoanCreated?: () => Promise<void> | void
+    currentUserCaseID?: string | null
 }
 
 const BookDataTable = ({
@@ -58,6 +59,7 @@ const BookDataTable = ({
     isLoggedIn,
     canManage = false,
     onLoanCreated = () => {},
+    currentUserCaseID,
 }: BookTableProps) => {
     const [selectedBook, setSelectedBook] = useState<BookData | null>(null)
     const allowManagement = editable || canManage
@@ -475,6 +477,7 @@ const BookDataTable = ({
             <BookDetailPopup
                     book={selectedBook}
                     isLoggedIn={isLoggedIn}
+                    patronCaseID={currentUserCaseID}
                     onClose={() => setSelectedBook(null)}
                     onLoanCreated={onLoanCreated}
                 />

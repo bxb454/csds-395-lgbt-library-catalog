@@ -272,14 +272,29 @@ function App() {
   const handleRestrictToggle = useCallback(
     async (caseID: string, value: boolean) => {
       try {
-        await updateUser(caseID, { isRestricted: value })
+        const current = users.find((u) => u.caseID === caseID)
+        const role = current?.role ?? "patron"
+        await updateUser(caseID, { role, isRestricted: value })
         await loadUsers()
       } catch (err) {
         console.error(err)
         alert("Failed to update user restrictions.")
       }
     },
-    [loadUsers],
+    [loadUsers, users],
+  )
+
+  const handleSetUserRole = useCallback(
+    async (caseID: string, role: string) => {
+      const exists = users.some((u) => u.caseID === caseID)
+      if (exists) {
+        await updateUser(caseID, { role })
+      } else {
+        await createUser({ caseID, role, isRestricted: false })
+      }
+      await loadUsers()
+    },
+    [users, loadUsers],
   )
 
   return (
@@ -351,6 +366,7 @@ function App() {
             isLoggedIn={isLoggedIn}
             canManage={canManageCatalog}
             onLoanCreated={handleLoanCreated}
+            currentUserCaseID={currentUser?.caseID}
           />
         )}
 
@@ -413,17 +429,10 @@ function App() {
                 {usersError}
               </div>
             )}
-            <StaffRolesTable users={availableUsers} />
-            {userRole === "admin" && (
-              <AdminUserTable
-                users={availableUsers}
-                onCreate={handleCreateUserRecord}
-                onUpdate={(caseID, updates) =>
-                  handleUpdateUserRecord(caseID, updates)
-                }
-                onDelete={handleDeleteUserRecord}
-              />
-            )}
+            <StaffRolesTable
+              users={availableUsers}
+              onSetRole={(caseID, role) => handleSetUserRole(caseID, role)}
+            />
           </>
         )}
       </div>

@@ -30,7 +30,11 @@ export async function updateUser(
 export async function createUser(
   user: BackendUser,
 ) {
-  await axios.post(`${API_BASE}/users`, user)
+  await axios.post(`${API_BASE}/users`, {
+    caseID: user.caseID,
+    role: user.role,
+    isRestricted: user.isRestricted ?? false,
+  })
 }
 
 export async function deleteUser(caseID: string) {
