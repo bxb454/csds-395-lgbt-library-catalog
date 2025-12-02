@@ -33,7 +33,6 @@ func (s *Server) HandleAuthors() http.Handler {
 
 		case http.MethodPost:
 			type payload struct {
-				AuthID int     `json:"authID"`
 				LName  *string `json:"lname"`
 				FName  *string `json:"fname"`
 			}
@@ -42,15 +41,15 @@ func (s *Server) HandleAuthors() http.Handler {
 				http.Error(w, "invalid json", http.StatusBadRequest)
 				return
 			}
-			if body.AuthID == 0 || *body.LName == "" || *body.FName == "" {
+			if *body.LName == "" || *body.FName == "" {
 				http.Error(w, "missing required fields", http.StatusBadRequest)
 				return
 			}
 
 			res, err := s.Db.ExecContext(r.Context(), `
-                INSERT INTO loan (authID, lname, fname)
-                VALUES (?, ?, 0)`,
-				body.AuthID, body.LName, body.FName,
+                INSERT INTO loan (lname, fname)
+                VALUES (?, ?)`,
+				body.LName, body.FName,
 			)
 			if err != nil {
 				http.Error(w, "insert failed", http.StatusInternalServerError)
