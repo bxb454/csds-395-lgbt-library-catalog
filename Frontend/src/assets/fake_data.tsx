@@ -26,7 +26,7 @@ export const fakeBookData1: BookData[] = [
     },
     {
         id: 3,
-        title: "A Quick & East Guide to They/Them Pronouns",
+        title: "A Quick & Easy Guide to They/Them Pronouns",
         author: 'Bongiovanni, Archie; Jimerson, Tristan',
         genre: 'Nonfiction',
         tags: ['Nonfiction'],
