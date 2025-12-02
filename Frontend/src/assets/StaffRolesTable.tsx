@@ -1,4 +1,5 @@
-import { useMemo, useState, type FC, type FormEvent } from "react"
+import { useEffect, useMemo, useState, type FC, type FormEvent } from "react"
+import type { UserData } from "./Types"
 import { sampleUsers } from "./sampleUsers"
 
 type RoleOption = "patron" | "staff" | "admin"
@@ -17,27 +18,40 @@ const mapRole = (role?: string): RoleOption | null => {
   return null
 }
 
-const DEFAULT_ASSIGNMENTS: RoleAssignment[] = sampleUsers
-  .map((user, idx) => {
-    const parsed = mapRole(user.role)
-    if (!parsed) {
-      return null
-    }
-    return {
-      id: user.id ?? idx + 1,
-      caseID: user.caseID,
-      role: parsed,
-    }
-  })
-  .filter((entry): entry is RoleAssignment => entry !== null)
+const buildAssignments = (users: UserData[]): RoleAssignment[] =>
+  users
+    .map((user, idx) => {
+      const parsed = mapRole(user.role)
+      if (!parsed) {
+        return null
+      }
+      return {
+        id: idx + 1,
+        caseID: user.caseID,
+        role: parsed,
+      }
+    })
+    .filter((entry): entry is RoleAssignment => entry !== null)
 
-const StaffRolesTable: FC = () => {
+interface StaffRolesTableProps {
+  users?: UserData[]
+}
+
+const StaffRolesTable: FC<StaffRolesTableProps> = ({ users = sampleUsers }) => {
+  const defaultAssignments = useMemo(
+    () => buildAssignments(users),
+    [users],
+  )
   const [assignments, setAssignments] = useState<RoleAssignment[]>(
-    DEFAULT_ASSIGNMENTS,
+    defaultAssignments,
   )
   const [caseIdInput, setCaseIdInput] = useState("")
   const [roleInput, setRoleInput] = useState<RoleOption>("patron")
   const [message, setMessage] = useState<string | null>(null)
+
+  useEffect(() => {
+    setAssignments(defaultAssignments)
+  }, [defaultAssignments])
 
   const sortedAssignments = useMemo(() => {
     return [...assignments]

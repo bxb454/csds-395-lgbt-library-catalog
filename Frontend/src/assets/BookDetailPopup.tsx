@@ -1,172 +1,456 @@
-import React, { useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import type { BookData } from "./Types"
+import {
+  addBookAuthor,
+  addBookTag,
+  deleteBookAuthor,
+  deleteBookTag,
+  fetchBookAuthors,
+  fetchBookTags,
+} from "../api/books"
+import { fetchAuthors, createAuthor, type Author } from "../api/authors"
+import { createLoan } from "../api/loans"
 
 interface BookDetailPopupProps {
-    book: BookData
-    onClose: () => void
-    isLoggedIn: boolean
+  book: BookData
+  onClose: () => void
+  isLoggedIn: boolean
+  onLoanCreated?: () => Promise<void> | void
 }
 
 const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
-    book,
-    onClose,
-    isLoggedIn,
+  book,
+  onClose,
+  isLoggedIn,
+  onLoanCreated,
 }) => {
-    const [staffID, setStaffID] = useState("");
+  const [staffID, setStaffID] = useState("")
+  const [borrowerCaseID, setBorrowerCaseID] = useState("")
+  const [authors, setAuthors] = useState<{ authID: number; name: string }[]>([])
+  const [tags, setTags] = useState<string[]>(book.tags ?? [])
+  const [availableAuthors, setAvailableAuthors] = useState<Author[]>([])
+  const [selectedAuthorId, setSelectedAuthorId] = useState("")
+  const [newTag, setNewTag] = useState("")
+  const [newAuthorLName, setNewAuthorLName] = useState("")
+  const [newAuthorFName, setNewAuthorFName] = useState("")
+  const [metaError, setMetaError] = useState<string | null>(null)
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null)
+  const [checkoutError, setCheckoutError] = useState<string | null>(null)
+  const [checkoutLoading, setCheckoutLoading] = useState(false)
 
-    const canCheckout = isLoggedIn && book.available > 0
+  useEffect(() => {
+    let isMounted = true
 
-    return (
-        <div
-            style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                width: "100vw",
-                height: "100vh",
-                backgroundColor: "black",
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                zIndex: 2000,
-            }}
-        >
-            <div
-                style={{
-                    width: "750px",
-                    backgroundColor: "white",
-                    border: "2px solid #777",
-                    padding: "30px",
-                    display: "grid",
-                    gridTemplateColumns: "1fr 240px",
-                    columnGap: "25px",
-                }}
-            >
-                <div>
-                    <div style={{ marginBottom: "15px" }}>
-                        <strong>Title:</strong><br />
-                        {book.title}
-                    </div>
+    const loadMeta = async () => {
+      try {
+        setMetaError(null)
+        const [authorResponse, tagResponse, allAuthors] = await Promise.all([
+          fetchBookAuthors(book.id),
+          fetchBookTags(book.id),
+          fetchAuthors(),
+        ])
+        if (!isMounted) return
+        setAuthors(
+          (authorResponse ?? []).map((author) => ({
+            authID: author.authID,
+            name: [author.fname, author.lname].filter(Boolean).join(" ").trim(),
+          })),
+        )
+        setTags(tagResponse ?? [])
+        setAvailableAuthors(allAuthors ?? [])
+      } catch (err) {
+        console.error(err)
+        if (isMounted) {
+          setMetaError("Failed to load book metadata.")
+        }
+      }
+    }
 
-                    <div style={{ marginBottom: "15px" }}>
-                        <strong>ISBN:</strong><br />
-                        {book.isbn || "[ISBN]"}
-                    </div>
+    void loadMeta()
+    return () => {
+      isMounted = false
+    }
+  }, [book.id])
 
-                    <div style={{ marginBottom: "15px" }}>
-                        <strong>Author(s):</strong><br />
-                        {book.author || ""}
-                    </div>
+  const authorOptions = useMemo(
+    () =>
+      availableAuthors.filter(
+        (author) => !authors.some((a) => a.authID === author.authID),
+      ),
+    [availableAuthors, authors],
+  )
 
-                    <div style={{ marginBottom: "15px" }}>
-                        <strong>Publishing info:</strong><br />
-                        {book.publisher || "[Publisher]"}<br />
-                        {book.edition || "[Edition]"}<br />
-                        {book.pubYear || "[PubYear]"}
-                    </div>
+  const handleAddTag = async () => {
+    const trimmed = newTag.trim()
+    if (!trimmed) return
+    try {
+      await addBookTag(book.id, trimmed)
+      setTags((prev) => [...prev, trimmed])
+      setNewTag("")
+    } catch (err) {
+      console.error(err)
+      setMetaError("Failed to add tag.")
+    }
+  }
 
-                </div>
+  const handleDeleteTag = async (tag: string) => {
+    try {
+      await deleteBookTag(book.id, tag)
+      setTags((prev) => prev.filter((existing) => existing !== tag))
+    } catch (err) {
+      console.error(err)
+      setMetaError("Failed to remove tag.")
+    }
+  }
 
-                <div>
-                    <div
-                        style={{
-                            width: "100%",
-                            height: "150px",
-                            backgroundColor: "#d0d0d0",
-                            border: "1px solid #999",
-                            marginBottom: "10px",
-                            display: "flex",
-                            justifyContent: "center",
-                            alignItems: "center",
-                        }}
-                    >
-                        Thumbnail
-                    </div>
+  const handleAddAuthor = async () => {
+    if (!selectedAuthorId) return
+    try {
+      await addBookAuthor(book.id, Number(selectedAuthorId))
+      const newlyAdded = authorOptions.find(
+        (author) => author.authID === Number(selectedAuthorId),
+      )
+      if (newlyAdded) {
+        setAuthors((prev) => [
+          ...prev,
+          {
+            authID: newlyAdded.authID,
+            name: [newlyAdded.fname, newlyAdded.lname]
+              .filter(Boolean)
+              .join(" ")
+              .trim(),
+          },
+        ])
+      }
+      setSelectedAuthorId("")
+    } catch (err) {
+      console.error(err)
+      setMetaError("Failed to add author.")
+    }
+  }
 
-                    <div style={{ marginBottom: "10px" }}>
-                        [{book.available}/{book.copies}] available
-                    </div>
+  const handleDeleteAuthor = async (authID: number) => {
+    try {
+      await deleteBookAuthor(book.id, authID)
+      setAuthors((prev) => prev.filter((author) => author.authID !== authID))
+    } catch (err) {
+      console.error(err)
+      setMetaError("Failed to remove author.")
+    }
+  }
 
-                    <div>{book.tags?.join(", ")}</div>
-                </div>
+  const handleCreateAuthor = async () => {
+    if (!newAuthorLName.trim()) return
+    try {
+      await createAuthor(newAuthorLName.trim(), newAuthorFName.trim() || undefined)
+      setPendingMessage("Author created. Refreshing list…")
+      setNewAuthorLName("")
+      setNewAuthorFName("")
+      const updatedAuthors = await fetchAuthors()
+      setAvailableAuthors(updatedAuthors)
+      setPendingMessage(null)
+    } catch (err) {
+      console.error(err)
+      setMetaError("Failed to create author.")
+    }
+  }
 
-                {canCheckout && (
-                    <div
-                        style={{
-                            gridColumn: "1 / span 2",
-                            marginTop: "20px",
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            textAlign: "center",
-                        }}
-                    >
-                        <strong>Check out item?</strong>
+  const canCheckout = isLoggedIn && book.available > 0
 
-                        <div style={{ marginTop: "6px" }}>
-                            Staff member on desk:{" "}
-                            <input
-                                value={staffID}
-                                onChange={(e) => setStaffID(e.target.value)}
-                                placeholder="Enter Case ID"
-                                style={{
-                                    border: "1px solid #777",
-                                    padding: "2px 4px",
-                                    width: "140px",
-                                }}
-                            />
-                        </div>
-                    </div>
-                )}
+  const formatDate = (date: Date) => date.toISOString().split("T")[0]
 
-                {/* FOOTER BUTTONS */}
-                <div
-                    style={{
-                        gridColumn: "1 / span 2",
-                        display: "flex",
-                        justifyContent: "center",
-                        gap: "80px",
-                        marginTop: "30px",
-                    }}
-                >
-                    <button
-                        onClick={onClose}
-                        style={{
-                            fontSize: "20px",
-                            color: "red",
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            textDecoration: "underline",
-                        }}
-                    >
-                        Cancel
-                    </button>
+  const handleCheckout = async () => {
+    const patronCase = borrowerCaseID.trim()
+    if (!patronCase) {
+      setCheckoutError("Enter a patron CASE ID before checking out.")
+      return
+    }
+    setCheckoutError(null)
+    try {
+      setCheckoutLoading(true)
+      const today = new Date()
+      const due = new Date()
+      due.setDate(today.getDate() + 14)
+      await createLoan({
+        bookID: book.id,
+        caseID: patronCase,
+        loanDate: formatDate(today),
+        dueDate: formatDate(due),
+        numRenewals: 0,
+      })
+      await onLoanCreated?.()
+      onClose()
+    } catch (err) {
+      console.error(err)
+      setCheckoutError("Checkout failed. Verify the CASE ID and try again.")
+    } finally {
+      setCheckoutLoading(false)
+    }
+  }
 
-                    {canCheckout && (
-                        <button
-                            onClick={() => {
-                                alert(
-                                    `Submitted checkout for "${book.title}" by staff: ${staffID}`
-                                );
-                                onClose()
-                            }}
-                            style={{
-                                fontSize: "20px",
-                                color: "blue",
-                                background: "none",
-                                border: "none",
-                                cursor: "pointer",
-                                textDecoration: "underline",
-                            }}
-                        >
-                            Submit
-                        </button>
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        width: "100vw",
+        height: "100vh",
+        backgroundColor: "black",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 2000,
+      }}
+    >
+      <div
+        style={{
+          width: "750px",
+          backgroundColor: "white",
+          border: "2px solid #777",
+          padding: "30px",
+          display: "grid",
+          gridTemplateColumns: "1fr 240px",
+          columnGap: "25px",
+        }}
+      >
+        <div>
+          <div style={{ marginBottom: "15px" }}>
+            <strong>Title:</strong>
+            <br />
+            {book.title}
+          </div>
+
+          <div style={{ marginBottom: "15px" }}>
+            <strong>ISBN:</strong>
+            <br />
+            {book.isbn || "[ISBN]"}
+          </div>
+
+          <div style={{ marginBottom: "15px" }}>
+            <strong>Author(s):</strong>
+            <br />
+            {authors.length > 0
+              ? authors.map((author) => (
+                  <div
+                    key={author.authID}
+                    style={{ display: "flex", gap: 8, alignItems: "center" }}
+                  >
+                    <span>{author.name}</span>
+                    {isLoggedIn && (
+                      <button
+                        style={{ fontSize: 12, cursor: "pointer" }}
+                        onClick={() => handleDeleteAuthor(author.authID)}
+                      >
+                        remove
+                      </button>
                     )}
-                </div>
-            </div>
+                  </div>
+                ))
+              : book.author || ""}
+            {isLoggedIn && authorOptions.length > 0 && (
+              <div style={{ marginTop: "10px" }}>
+                <select
+                  value={selectedAuthorId}
+                  onChange={(e) => setSelectedAuthorId(e.target.value)}
+                >
+                  <option value="">Add existing author</option>
+                  {authorOptions.map((author) => (
+                    <option key={author.authID} value={author.authID}>
+                      {[author.fname, author.lname].filter(Boolean).join(" ")}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  style={{ marginLeft: 8 }}
+                  onClick={handleAddAuthor}
+                  disabled={!selectedAuthorId}
+                >
+                  Add
+                </button>
+              </div>
+            )}
+            {isLoggedIn && (
+              <div style={{ marginTop: "10px" }}>
+                <div style={{ fontSize: 12, marginBottom: 4 }}>Create new author</div>
+                <input
+                  placeholder="Last name"
+                  value={newAuthorLName}
+                  onChange={(e) => setNewAuthorLName(e.target.value)}
+                  style={{ marginRight: 4 }}
+                />
+                <input
+                  placeholder="First name"
+                  value={newAuthorFName}
+                  onChange={(e) => setNewAuthorFName(e.target.value)}
+                  style={{ marginRight: 4 }}
+                />
+                <button onClick={handleCreateAuthor}>Create</button>
+                {pendingMessage && <div style={{ fontSize: 12 }}>{pendingMessage}</div>}
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginBottom: "15px" }}>
+            <strong>Publishing info:</strong>
+            <br />
+            {book.publisher || "[Publisher]"}
+            <br />
+            {book.edition || "[Edition]"}
+            <br />
+            {book.pubYear || "[PubYear]"}
+          </div>
         </div>
-    );
-};
+
+        <div>
+          <div
+            style={{
+              width: "100%",
+              height: "150px",
+              backgroundColor: "#d0d0d0",
+              border: "1px solid #999",
+              marginBottom: "10px",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            Thumbnail
+          </div>
+
+          <div style={{ marginBottom: "10px" }}>
+            [{book.available}/{book.copies}] available
+          </div>
+
+          <div>
+            {tags.length > 0 ? (
+              <ul style={{ paddingLeft: 20 }}>
+                {tags.map((tag) => (
+                  <li key={tag} style={{ marginBottom: 4 }}>
+                    {tag}
+                    {isLoggedIn && (
+                      <button
+                        style={{ marginLeft: 8, fontSize: 12 }}
+                        onClick={() => handleDeleteTag(tag)}
+                      >
+                        remove
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              "No tags yet"
+            )}
+            {isLoggedIn && (
+              <div style={{ marginTop: 8 }}>
+                <input
+                  placeholder="Add tag"
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                />
+                <button
+                  style={{ marginLeft: 8 }}
+                  onClick={handleAddTag}
+                  disabled={!newTag.trim()}
+                >
+                  Add Tag
+                </button>
+              </div>
+            )}
+          </div>
+          {metaError && (
+            <div style={{ color: "#c62828", marginTop: "8px" }}>{metaError}</div>
+          )}
+        </div>
+
+        {canCheckout && (
+          <div
+            style={{
+              gridColumn: "1 / span 2",
+              marginTop: "20px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              textAlign: "center",
+            }}
+          >
+            <strong>Check out item?</strong>
+
+            <div style={{ marginTop: "6px" }}>
+              Patron CASE ID:{" "}
+              <input
+                value={borrowerCaseID}
+                onChange={(e) => setBorrowerCaseID(e.target.value)}
+                placeholder="pat123"
+                style={{
+                  border: "1px solid #777",
+                  padding: "2px 4px",
+                  width: "140px",
+                  marginRight: "8px",
+                }}
+              />
+              Processed by:{" "}
+              <input
+                value={staffID}
+                onChange={(e) => setStaffID(e.target.value)}
+                placeholder="Staff CASE ID"
+                style={{
+                  border: "1px solid #777",
+                  padding: "2px 4px",
+                  width: "140px",
+                }}
+              />
+            </div>
+            {checkoutError && (
+              <div style={{ color: "#c62828", marginTop: 8 }}>{checkoutError}</div>
+            )}
+          </div>
+        )}
+
+        <div
+          style={{
+            gridColumn: "1 / span 2",
+            display: "flex",
+            justifyContent: "center",
+            gap: "80px",
+            marginTop: "30px",
+          }}
+        >
+          <button
+            onClick={onClose}
+            style={{
+              fontSize: "20px",
+              color: "red",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              textDecoration: "underline",
+            }}
+          >
+            Cancel
+          </button>
+
+          {canCheckout && (
+            <button
+              onClick={handleCheckout}
+              disabled={checkoutLoading}
+              style={{
+                fontSize: "20px",
+                color: checkoutLoading ? "gray" : "blue",
+                background: "none",
+                border: "none",
+                cursor: checkoutLoading ? "not-allowed" : "pointer",
+                textDecoration: "underline",
+              }}
+            >
+              {checkoutLoading ? "Submitting..." : "Submit"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export default BookDetailPopup

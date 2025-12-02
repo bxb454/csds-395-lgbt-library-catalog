@@ -15,8 +15,7 @@ interface Props {
     onRenew: (loan: LoanRecord) => void
     onReturn: (loan: LoanRecord) => void
 
-    //from admin-only check
-    onRestrictToggle: (userId: number, newValue: boolean) => void
+    onRestrictToggle: (caseID: string, newValue: boolean) => void
 }
 
 const AllLoansTable: React.FC<Props> = ({
@@ -28,22 +27,34 @@ const AllLoansTable: React.FC<Props> = ({
     onRestrictToggle,
 }) => {
     /** Lookup helpers */
-    const getUser = (userId: number) =>
-        users.find((u) => u.id === userId) ?? ({} as UserData)
+    const getUser = (caseID: string | null): UserData =>
+        users.find((u) => u.caseID === caseID) ?? {
+            caseID: caseID ?? "Unknown",
+            role: "patron",
+            isRestricted: false,
+        }
 
     const getBook = (bookId: number) =>
         books.find((b) => b.id === bookId) ?? ({} as BookData)
+
+    const formatDate = (value: string) => {
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) {
+            return value;
+        }
+        return parsed.toLocaleDateString();
+    };
 
     /** DEFINE COLUMNS */
     const columns = useMemo<MRT_ColumnDef<LoanRecord>[]>(() => [
         // PATRON NAME
         {
-            accessorKey: "userId",
+            accessorKey: "caseID",
             header: "Patron",
             size: 110,
             Cell: ({ cell }) => {
-                const user = getUser(cell.getValue<number>());
-                return <span>{user.caseID}</span>;
+                const value = cell.getValue<string | null>();
+                return <span>{value ?? "Unknown"}</span>;
             },
         },
 
@@ -76,9 +87,9 @@ const AllLoansTable: React.FC<Props> = ({
                 const loan = row.original;
                 return (
                     <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <span>Loan date: {loan.loanDate}</span>
-                        <span>Due date: {loan.dueDate}</span>
-                        <span>numRenewals: {loan.renewalCount ?? 0}</span>
+                        <span>Loan date: {formatDate(loan.loanDate)}</span>
+                        <span>Due date: {formatDate(loan.dueDate)}</span>
+                        <span>numRenewals: {loan.renewalCount}</span>
                     </div>
                 );
             },
@@ -91,7 +102,7 @@ const AllLoansTable: React.FC<Props> = ({
             size: 150,
             Cell: ({ row }) => {
                 const loan = row.original;
-                const user = getUser(loan.userId);
+                const user = getUser(loan.caseID);
 
                 return (
                     <div
@@ -131,7 +142,8 @@ const AllLoansTable: React.FC<Props> = ({
                                 type="checkbox"
                                 checked={user.isRestricted}
                                 onChange={(e) =>
-                                    onRestrictToggle(user.id, e.target.checked)
+                                    user.caseID &&
+                                    onRestrictToggle(user.caseID, e.target.checked)
                                 }
                             />{" "}
                             Restrict User

@@ -46,7 +46,7 @@ const LoanActionPopup: React.FC<LoanActionPopupProps> = ({
 
         {mode === "renew" ? (
           <p style={{ fontSize: "18px", marginBottom: "25px" }}>
-            This is your <strong>{renewalCount}</strong> renewal on this loan
+            This is your <strong>{renewalCount + 1}</strong> renewal on this loan
           </p>
         ) : (
           <p style={{ fontSize: "18px", marginBottom: "25px" }}>

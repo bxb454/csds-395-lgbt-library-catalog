@@ -4,12 +4,20 @@ import {
     useMaterialReactTable,
 } from "material-react-table"
 import { useMemo, useState, type MouseEvent } from "react"
-import { Box, Button, IconButton } from "@mui/material"
+import { Box, IconButton } from "@mui/material"
 import { Delete, Edit } from "@mui/icons-material"
 import type { BookData } from "./Types"
-import { fakeBookData1 } from "./fake_data"
 import { filterBooks, type SearchOption } from "./catalogSearch"
 import BookDetailPopup from "./BookDetailPopup"
+import {
+    deleteBook,
+    updateBook,
+    type BookWritePayload,
+    fetchBookAuthors,
+    fetchBookTags,
+    deleteBookAuthor,
+    deleteBookTag,
+} from "../api/books"
 
 type EditFormState = {
     id: number
@@ -27,21 +35,30 @@ type EditFormState = {
 }
 
 interface BookTableProps {
+    books: BookData[]
+    onRefreshBooks: () => Promise<void> | void
+    loading?: boolean
+    error?: string | null
     editable?: boolean
     searchBy?: SearchOption
     searchText?: string
     isLoggedIn: boolean
     canManage?: boolean
+    onLoanCreated?: () => Promise<void> | void
 }
 
 const BookDataTable = ({
+    books,
+    onRefreshBooks,
+    loading = false,
+    error = null,
     editable = false,
     searchBy = "general",
     searchText = "",
     isLoggedIn,
     canManage = false,
+    onLoanCreated = () => {},
 }: BookTableProps) => {
-    const [data, setData] = useState<BookData[]>(fakeBookData1)
     const [selectedBook, setSelectedBook] = useState<BookData | null>(null)
     const allowManagement = editable || canManage
     const [editForm, setEditForm] = useState<EditFormState | null>(null)
@@ -62,15 +79,33 @@ const BookDataTable = ({
                             alignItems: "center",
                         }}
                     >
-                        <img
-                            src={cell.getValue<string>()}
-                            style={{
-                                width: 72,
-                                height: 72,
-                                borderRadius: "6px",
-                                objectFit: "cover",
-                            }}
-                        />
+                        {cell.getValue<string>() ? (
+                            <img
+                                src={cell.getValue<string>()}
+                                style={{
+                                    width: 72,
+                                    height: 72,
+                                    borderRadius: "6px",
+                                    objectFit: "cover",
+                                }}
+                            />
+                        ) : (
+                            <div
+                                style={{
+                                    width: 60,
+                                    height: 72,
+                                    borderRadius: "6px",
+                                    backgroundColor: "#f1f1f1",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#999",
+                                    fontSize: 10,
+                                }}
+                            >
+                                No Image
+                            </div>
+                        )}
                     </div>
                 ),
             },
@@ -101,8 +136,8 @@ const BookDataTable = ({
                 header: "",
                 size: 200,
                 Cell: ({ row }) => {
-                    const book = row.original;
-                    const copiesLabel = book.copies === 1 ? "copy" : "copies";
+                    const book = row.original
+                    const copiesLabel = book.copies === 1 ? "copy" : "copies"
 
                     const tagsText =
                         (book.tags && book.tags.length > 0
@@ -130,9 +165,9 @@ const BookDataTable = ({
     )
 
     const filteredData = useMemo(
-        () => filterBooks(data, searchBy, searchText),
-        [data, searchBy, searchText]
-    );
+        () => filterBooks(books, searchBy, searchText),
+        [books, searchBy, searchText],
+    )
 
     const createEditState = (book: BookData): EditFormState => ({
         id: book.id,
@@ -148,12 +183,6 @@ const BookDataTable = ({
         copies: String(book.copies ?? 0),
         available: String(book.available ?? 0),
     })
-
-    const parseTagsInput = (input: string): string[] =>
-        input
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter((tag) => tag.length > 0)
 
     const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0]
@@ -174,11 +203,41 @@ const BookDataTable = ({
         reader.readAsDataURL(file)
     }
 
-    const handleDeleteRow = (row: any, event?: MouseEvent) => {
+    const handleDeleteRow = async (row: any, event?: MouseEvent) => {
         event?.stopPropagation()
-        if (window.confirm("Are you sure you want to delete this row?")) {
-            const newData = data.filter((book) => book.id !== row.original.id);
-            setData(newData);
+        if (!window.confirm("Are you sure you want to delete this book?")) {
+            return
+        }
+        try {
+            const bookId = row.original.id
+            try {
+                const [authorsRaw, tagsRaw] = await Promise.all([
+                    fetchBookAuthors(bookId).catch(() => null),
+                    fetchBookTags(bookId).catch(() => null),
+                ])
+
+                const authors = Array.isArray(authorsRaw) ? authorsRaw : []
+                const tags = Array.isArray(tagsRaw) ? tagsRaw : []
+
+                await Promise.all([
+                    ...tags.map((tag: string) =>
+                        deleteBookTag(bookId, tag).catch((err) => console.error(err)),
+                    ),
+                    ...authors.map((author: { authID: number }) =>
+                        deleteBookAuthor(bookId, author.authID).catch((err) =>
+                            console.error(err),
+                        ),
+                    ),
+                ])
+            } catch (cleanupErr) {
+                console.error("Failed to remove book metadata before delete", cleanupErr)
+            }
+
+            await deleteBook(bookId)
+            await onRefreshBooks()
+        } catch (err) {
+            console.error(err)
+            alert("Failed to delete book. Please try again.")
         }
     }
 
@@ -191,7 +250,16 @@ const BookDataTable = ({
         setEditForm((prev) => (prev ? { ...prev, [field]: value } : prev))
     }
 
-    const handleEditSave = () => {
+    const buildWritePayload = (form: EditFormState, copies: number): BookWritePayload => ({
+        title: form.title || "Untitled",
+        copies,
+        isbn: form.isbn || undefined,
+        pubdate: form.pubYear ? `${form.pubYear}-01-01` : undefined,
+        publisher: form.publisher || undefined,
+        edition: form.edition || undefined,
+    })
+
+    const handleEditSave = async () => {
         if (!editForm) return
 
         const copies = Number(editForm.copies)
@@ -212,25 +280,14 @@ const BookDataTable = ({
             return
         }
 
-        const updated: BookData = {
-            id: editForm.id,
-            title: editForm.title || "Untitled",
-            author: editForm.author || undefined,
-            genre: editForm.genre || undefined,
-            publisher: editForm.publisher || undefined,
-            edition: editForm.edition || undefined,
-            image: editForm.image || undefined,
-            pubYear: editForm.pubYear ? Number(editForm.pubYear) : undefined,
-            isbn: editForm.isbn ? Number(editForm.isbn) : undefined,
-            tags: parseTagsInput(editForm.tagsInput),
-            copies,
-            available,
+        try {
+            await updateBook(editForm.id, buildWritePayload(editForm, copies))
+            await onRefreshBooks()
+            setEditForm(null)
+        } catch (err) {
+            console.error(err)
+            alert("Failed to save changes. Please try again.")
         }
-
-        setData((prev) =>
-            prev.map((book) => (book.id === updated.id ? updated : book)),
-        )
-        setEditForm(null)
     }
 
     const closeEditForm = () => setEditForm(null)
@@ -239,7 +296,6 @@ const BookDataTable = ({
         columns,
         data: filteredData,
         enableEditing: false,
-
         enableTableHead: false,
         positionActionsColumn: allowManagement ? "last" : undefined,
         enableColumnFilters: false,
@@ -251,7 +307,6 @@ const BookDataTable = ({
         enableFullScreenToggle: false,
         enableSorting: false,
         enableTopToolbar: false,
-
         enableRowActions: allowManagement,
         renderRowActions: allowManagement
             ? ({ row }) => (
@@ -272,13 +327,11 @@ const BookDataTable = ({
                 </Box>
             )
             : undefined,
-
         muiTableBodyRowProps: ({ row }) => ({
             sx: { height: 90 },
             onClick: () => setSelectedBook(row.original),
             style: { cursor: "pointer" },
         }),
-
         muiTableBodyCellProps: {
             sx: {
                 py: 0.5,
@@ -288,7 +341,6 @@ const BookDataTable = ({
                 "&:last-of-type": { borderRight: "none" },
             },
         },
-
         muiTableHeadCellProps: {
             sx: {
                 py: 0.5,
@@ -298,12 +350,11 @@ const BookDataTable = ({
                 "&:last-of-type": { borderRight: "none" },
             },
         },
-
         muiTablePaperProps: {
             elevation: 0,
             sx: { boxShadow: "none", borderRadius: 0 },
         },
-    });
+    })
 
     return (
         <>
@@ -315,6 +366,23 @@ const BookDataTable = ({
                     }}
                 >
                     <MaterialReactTable table={table} />
+                    {loading && (
+                        <div style={{ padding: "12px", textAlign: "center" }}>
+                            Loading books...
+                        </div>
+                    )}
+                    {error && (
+                        <div
+                            style={{
+                                padding: "12px",
+                                textAlign: "center",
+                                color: "#c62828",
+                                fontWeight: 600,
+                            }}
+                        >
+                            {error}
+                        </div>
+                    )}
                 </Box>
             </Box>
 
@@ -323,6 +391,7 @@ const BookDataTable = ({
                     book={selectedBook}
                     isLoggedIn={isLoggedIn}
                     onClose={() => setSelectedBook(null)}
+                    onLoanCreated={onLoanCreated}
                 />
             )}
 

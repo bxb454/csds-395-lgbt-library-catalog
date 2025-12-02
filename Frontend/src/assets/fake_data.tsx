@@ -13,7 +13,7 @@ export const fakeBookData1: BookData[] = [
         publisher: "Something",
         edition: "99th",
         pubYear: 2020,
-        isbn: 1234567890,
+        isbn: "1234567890",
     },
     {
         id: 2,
@@ -37,38 +37,37 @@ export const fakeBookData1: BookData[] = [
 ]
 export const fakeUserData1: UserData[] = [
     {
-        id: 1,
         caseID: "bob",
-        role: "employee",
-        isRestricted: false
+        role: "staff",
+        isRestricted: false,
     },
     {
-        id: 2,
         caseID: "alice",
         role: "admin",
-        isRestricted: false
+        isRestricted: false,
     },
     {
-        id: 3,
         caseID: "ttt333",
-        isRestricted: true
-    }
-
+        role: "patron",
+        isRestricted: true,
+    },
 ]
 
 export const loans: LoanRecord[] = [
   {
     loanId: 1,
-    userId: 1,
+    caseID: "bob",
     bookId: 1,
     loanDate: "2025-11-01",
     dueDate: "2025-12-01",
+    renewalCount: 0,
   },
   {
     loanId: 2,
-    userId: 2,
+    caseID: "alice",
     bookId: 2,
     loanDate: "2025-11-05",
     dueDate: "2025-12-05",
+    renewalCount: 0,
   },
 ]

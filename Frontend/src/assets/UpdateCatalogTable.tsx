@@ -6,28 +6,17 @@ import {
 import { Box, Button } from "@mui/material"
 import { useEffect, useMemo, useState } from "react"
 import type { BookData } from "./Types"
-import { fakeBookData1 } from "./fake_data"
+import {
+  addBookAuthor,
+  addBookTag,
+  createBook,
+  type BookWritePayload,
+} from "../api/books"
+import { fetchAuthors, type Author } from "../api/authors"
 
 type UpdateCatalogTableProps = {
-  books?: BookData[]
-  onBooksChange?: (updated: BookData[]) => void
-}
-
-const parseTags = (value: unknown): string[] => {
-  if (Array.isArray(value)) {
-    return value
-      .map((tag: string) => tag.trim())
-      .filter((tag: string) => tag.length > 0)
-  }
-
-  if (typeof value === "string") {
-    return value
-      .split(",")
-      .map((tag) => tag.trim())
-      .filter((tag) => tag.length > 0)
-  }
-
-  return []
+  books: BookData[]
+  onRefreshBooks: () => Promise<void> | void
 }
 
 const numberOrDefault = (value: unknown, fallback: number) => {
@@ -36,19 +25,20 @@ const numberOrDefault = (value: unknown, fallback: number) => {
 }
 
 const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
-  books = fakeBookData1,
-  onBooksChange,
+  books,
+  onRefreshBooks,
 }) => {
-  const [data, setData] = useState<BookData[]>(books)
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [authors, setAuthors] = useState<Author[]>([])
 
   useEffect(() => {
-    setData(books)
-  }, [books])
-
-  const updateData = (next: BookData[]) => {
-    setData(next)
-    onBooksChange?.(next)
-  }
+    fetchAuthors()
+      .then((list) => setAuthors(list))
+      .catch((err) => {
+        console.error(err)
+      })
+  }, [])
 
   const columns = useMemo<MRT_ColumnDef<BookData>[]>(() => [
     {
@@ -85,11 +75,38 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
       header: "Publisher",
     },
     {
+      accessorKey: "edition",
+      header: "Edition",
+    },
+    {
+      accessorKey: "pubdate",
+      header: "Publication Date",
+      muiTableBodyCellEditTextFieldProps: {
+        type: "date",
+      },
+    },
+    {
       accessorKey: "isbn",
       header: "ISBN",
     },
     {
-      accessorFn: (row) => row.tags?.join(", ") ?? "",
+      accessorKey: "author",
+      header: "Author",
+      muiTableBodyCellEditTextFieldProps: {
+        placeholder: "Author name",
+      },
+    },
+    {
+      accessorKey: "genre",
+      header: "Genre",
+    },
+    {
+      accessorFn: (row) =>
+        Array.isArray(row.tags)
+          ? row.tags.join(", ")
+          : typeof row.tags === "string"
+            ? row.tags
+            : "",
       id: "tags",
       header: "Tags",
       muiTableBodyCellEditTextFieldProps: {
@@ -100,13 +117,14 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
 
   const table = useMaterialReactTable({
     columns,
-    data,
+    data: books,
     enableEditing: false,
     renderTopToolbarCustomActions: ({ table }) => (
       <Button
         variant="contained"
         color="primary"
         onClick={() => table.setCreatingRow(true)}
+        disabled={isSaving}
       >
         Add Book
       </Button>
@@ -114,24 +132,74 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
     editDisplayMode: "modal",
     createDisplayMode: "modal",
     onCreatingRowSave: async ({ values, table }) => {
-      const newBook: BookData = {
-        id: data.length ? Math.max(...data.map((book) => book.id)) + 1 : 1,
+      setError(null)
+      const copies = numberOrDefault(values.copies, 0)
+      if (copies <= 0) {
+        setError("Copies must be greater than 0.")
+        return
+      }
+      const payload: BookWritePayload = {
         title: values.title || "Untitled",
-        copies: numberOrDefault(values.copies, 0),
-        available: numberOrDefault(values.available, 0),
-        author: values.author,
-        genre: values.genre,
+        copies,
+        isbn: values.isbn ? String(values.isbn) : undefined,
         publisher: values.publisher,
-        isbn: values.isbn,
-        tags: parseTags(values.tags),
+        edition: values.edition,
+        pubdate: values.pubdate,
       }
 
-      if (newBook.available > newBook.copies) {
-        newBook.available = newBook.copies
+      const authorNames = values.author
+        ? String(values.author)
+            .split(",")
+            .map((name) => name.trim())
+            .filter((name) => name.length > 0)
+        : []
+      const tagInput = values.tags
+        ? String(values.tags)
+            .split(",")
+            .map((tag) => tag.trim())
+            .filter((tag) => tag.length > 0)
+        : []
+      if (values.genre) {
+        tagInput.push(String(values.genre).trim())
       }
 
-      updateData([...data, newBook])
-      table.setCreatingRow(null)
+      try {
+        setIsSaving(true)
+        const newId = await createBook(payload)
+        table.setCreatingRow(null)
+        let unmatchedAuthors: string[] = []
+        if (newId) {
+          await Promise.all([
+            ...tagInput.map((tag) => addBookTag(newId, tag)),
+            ...authorNames.map(async (name) => {
+              const match = authors.find((author) => {
+                const fullName = [author.fname, author.lname]
+                  .filter(Boolean)
+                  .join(" ")
+                  .trim()
+                  .toLowerCase()
+                return fullName === name.toLowerCase()
+              })
+              if (match) {
+                await addBookAuthor(newId, match.authID)
+              } else {
+                unmatchedAuthors.push(name)
+              }
+            }),
+          ])
+        }
+        await onRefreshBooks()
+        if (unmatchedAuthors.length > 0) {
+          setError(`Unable to match authors: ${unmatchedAuthors.join(", ")}`)
+        } else {
+          setError(null)
+        }
+      } catch (err) {
+        console.error(err)
+        setError("Failed to add book. Please try again.")
+      } finally {
+        setIsSaving(false)
+      }
     },
     muiTableBodyRowProps: { sx: { height: 72 } },
     muiTableBodyCellProps: {
@@ -158,6 +226,18 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
     <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
       <Box sx={{ width: "900px", border: "1px solid #999" }}>
         <MaterialReactTable table={table} />
+        {error && (
+          <Box
+            sx={{
+              p: 2,
+              textAlign: "center",
+              color: "#c62828",
+              fontWeight: 600,
+            }}
+          >
+            {error}
+          </Box>
+        )}
       </Box>
     </Box>
   )
