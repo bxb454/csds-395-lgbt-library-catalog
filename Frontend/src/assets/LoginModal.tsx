@@ -27,7 +27,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onSignIn }) =>
           <p>Select a sample user:</p>
           {sampleUsers.map((user) => (
             <button
-              key={user.id}
+              key={user.caseID}
               className="signin-button"
               onClick={() => handleUserSelect(user)}
             >

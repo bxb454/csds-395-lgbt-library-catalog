@@ -54,12 +54,22 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const placeholderMap: Record<SearchOption, string> = {
+    general: "Search by title, author, or keyword…",
+    title: "Search by title…",
+    author: "Search by author…",
+    keyword: "Search by keyword or tag…",
+    isbn: "Search by ISBN…",
+    "before date": "Find books published before (YYYY)…",
+    "after date": "Find books published after (YYYY)…",
+  }
+
   // Nav Menu items
   const menuItems: { title: string; page: PageName; visible: boolean }[] = [
     { title: "Catalog Search", page: "catalog", visible: true },
     { title: "My Loans", page: "myloans", visible: true },
     { title: "All Loans", page: "allloans", visible: role === "staff" || role === "admin" },
-    { title: "Update Catalog", page: "updatecatalog", visible: role === "staff" || role === "admin" },
+    { title: "Add to Catalog", page: "updatecatalog", visible: role === "staff" || role === "admin" },
     { title: "Staff Roles", page: "staffroles", visible: role === "admin" },
   ];
 
@@ -109,7 +119,7 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
                   height: "100%",
                   width: "150px",
                   fontSize: "16px",
-                  color: "blue",
+                  color: "#444",
                   textTransform: "none",
                   display: "flex",
                   justifyContent: "space-between",
@@ -126,29 +136,36 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
                 />
               </Button>
 
-              <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={() => setAnchorEl(null)}
-              >
-                {searchOptions.map((opt) => (
-                  <MenuItem
-                    key={opt}
-                    selected={opt === searchBy}
-                    onClick={() => {
-                      onSearchByChange(opt)
-                      setAnchorEl(null)
-                    }}
-                  >
-                    {opt}
-                  </MenuItem>
-                ))}
-              </Menu>
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={() => setAnchorEl(null)}
+      >
+        {searchOptions.map((opt) => (
+          <MenuItem
+            key={opt}
+            selected={opt === searchBy}
+            onClick={() => {
+              onSearchByChange(opt)
+              setAnchorEl(null)
+            }}
+          >
+            {opt
+              .split(" ")
+              .map((word) =>
+                word.toLowerCase() === "isbn"
+                  ? "ISBN"
+                  : word.charAt(0).toUpperCase() + word.slice(1),
+              )
+              .join(" ")}
+          </MenuItem>
+        ))}
+      </Menu>
 
               {/* text field */}
               <TextField
                 variant="standard"
-                placeholder={`search the catalog… [text field]`}
+                placeholder={placeholderMap[searchBy]}
                 value={searchText}
                 onChange={(e) => onSearchTextChange(e.target.value)}
                 sx={{
@@ -164,7 +181,7 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
             <span style={{ fontSize: "18px", fontWeight: 500 }}>
               {currentPage === "myloans" && "My Loans"}
               {currentPage === "allloans" && "All Loans"}
-              {currentPage === "updatecatalog" && "Update Catalog"}
+              {currentPage === "updatecatalog" && "Add to Catalog"}
               {currentPage === "staffroles" && "Staff Roles"}
             </span>
           )}

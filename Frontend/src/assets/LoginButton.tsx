@@ -1,9 +1,7 @@
 import React from 'react'
 
-/*
 const CAS_LOGIN_URL =
-  'https://login.case.edu/cas/login?service=http://lgbt-cat.case.edu
-  */
+  "https://login.case.edu/cas/login?service=http://lgbt-cat.case.edu"
 
 type LoginButtonProps = {
   isLoggedIn: boolean
@@ -18,13 +16,11 @@ const LoginButton: React.FC<LoginButtonProps> = ({
   onLogout,
 }) => {
   const handleLogin = () => {
-    onLogin()
-    // window.location.replace(CAS_LOGIN_URL);
+    window.location.replace(CAS_LOGIN_URL)
   };
 
   return (
     <button
-      // onClick={handleLogin}
       onClick={isLoggedIn ? onLogout : handleLogin}
       className="login-button"
     >

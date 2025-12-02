@@ -9,6 +9,33 @@ import (
 	"strings"
 )
 
+// another helper function. move to bottom.
+func (bf BookFilters) buildWhereClause() (string, []any) {
+	var conditions []string
+	var args []any
+
+	if bf.Title != "" {
+		conditions = append(conditions, "title LIKE ?")
+		args = append(args, "%"+bf.Title+"%")
+	}
+	if bf.ISBN != "" {
+		conditions = append(conditions, "isbn = ?")
+		args = append(args, bf.ISBN)
+	}
+	if bf.Publisher != "" {
+		conditions = append(conditions, "publisher LIKE ?")
+		args = append(args, "%"+bf.Publisher+"%")
+	}
+
+	//join conditions with " AND " and prepend "WHERE" if there are any conditions
+	whereClause := ""
+	if len(conditions) > 0 {
+		whereClause = " WHERE " + strings.Join(conditions, " AND ")
+	}
+
+	return whereClause, args
+}
+
 func (s *Server) queryBooksWithFilters(ctx context.Context, filters BookFilters, pagination PaginationParams) ([]book, int, error) {
 	whereClause, args := filters.buildWhereClause()
 
@@ -133,7 +160,7 @@ func (s *Server) HandleBookByID() http.Handler {
 		bookID := parts[0]
 		//relation := parts[1]
 
-		if len(parts) == 2 {
+		if len(parts) >= 2 {
 			relation := parts[1]
 			switch relation {
 			case "authors":
@@ -281,14 +308,20 @@ func (s *Server) HandleBookTags(w http.ResponseWriter, r *http.Request, bookID s
 			return
 		}
 
-		_, err := s.Db.ExecContext(r.Context(), `
+		res, err := s.Db.ExecContext(r.Context(), `
             INSERT INTO booktags (bookID, tag)
             VALUES (?, ?)`,
 			bookID, body.Tag,
 		)
 		if err != nil {
+			log.Printf("add tag failed: bookID=%s tag=%s err=%v", bookID, body.Tag, err)
 			http.Error(w, "insert failed", http.StatusInternalServerError)
 			return
+		}
+		if rows, _ := res.RowsAffected(); rows == 0 {
+			log.Printf("add tag no rows: bookID=%s tag=%s", bookID, body.Tag)
+		} else {
+			log.Printf("added tag: bookID=%s tag=%s rows=%d", bookID, body.Tag, rows)
 		}
 		w.WriteHeader(http.StatusCreated)
 
@@ -374,14 +407,20 @@ func (s *Server) HandleBookAuthors(w http.ResponseWriter, r *http.Request, bookI
 			return
 		}
 
-		_, err := s.Db.ExecContext(r.Context(), `
+		res, err := s.Db.ExecContext(r.Context(), `
             INSERT INTO bookAuthor (bookID, authID)
             VALUES (?, ?)`,
 			bookID, body.AuthID,
 		)
 		if err != nil {
+			log.Printf("link author failed: bookID=%s authID=%d err=%v", bookID, body.AuthID, err)
 			http.Error(w, "insert failed", http.StatusInternalServerError)
 			return
+		}
+		if rows, _ := res.RowsAffected(); rows == 0 {
+			log.Printf("link author no rows: bookID=%s authID=%d", bookID, body.AuthID)
+		} else {
+			log.Printf("linked author: bookID=%s authID=%d rows=%d", bookID, body.AuthID, rows)
 		}
 		w.WriteHeader(http.StatusCreated)
 

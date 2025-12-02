@@ -18,6 +18,14 @@ const MyLoansTable: React.FC<Props> = ({ loans, books, onRenew, onReturn }) => {
     const getBook = (bookId: number) =>
         books.find((b) => b.id === bookId) ?? ({} as BookData);
 
+    const formatDate = (value: string) => {
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) {
+            return value;
+        }
+        return parsed.toLocaleDateString();
+    };
+
     const columns = useMemo<MRT_ColumnDef<LoanRecord>[]>(() => [
         {
             accessorKey: "bookId",
@@ -25,10 +33,19 @@ const MyLoansTable: React.FC<Props> = ({ loans, books, onRenew, onReturn }) => {
             size: 70,
             Cell: ({ cell }) => {
                 const book = getBook(cell.getValue<number>())
-                return (
+                return book?.image ? (
                     <img
                         src={book.image}
                         style={{ width: 50, height: 50, borderRadius: 6 }}
+                    />
+                ) : (
+                    <div
+                        style={{
+                            width: 50,
+                            height: 50,
+                            borderRadius: 6,
+                            backgroundColor: "#f1f1f1",
+                        }}
                     />
                 )
             },
@@ -53,11 +70,13 @@ const MyLoansTable: React.FC<Props> = ({ loans, books, onRenew, onReturn }) => {
             accessorKey: "loanDate",
             header: "Loan date",
             size: 90,
+            Cell: ({ cell }) => formatDate(cell.getValue<string>()),
         },
         {
             accessorKey: "dueDate",
             header: "Due date",
             size: 90,
+            Cell: ({ cell }) => formatDate(cell.getValue<string>()),
         },
         {
             id: "actions",

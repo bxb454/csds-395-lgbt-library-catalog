@@ -2,6 +2,7 @@ package api
 
 import (
 	"net/http"
+	"strings"
 )
 
 // dan wrote this
@@ -33,24 +34,23 @@ func (s *Server) HandleAuthors() http.Handler {
 
 		case http.MethodPost:
 			type payload struct {
-				AuthID int     `json:"authID"`
-				LName  *string `json:"lname"`
-				FName  *string `json:"fname"`
+				LName string  `json:"lname"`
+				FName *string `json:"fname"`
 			}
 			var body payload
 			if err := decodeJSON(r, &body); err != nil {
 				http.Error(w, "invalid json", http.StatusBadRequest)
 				return
 			}
-			if body.AuthID == 0 || *body.LName == "" || *body.FName == "" {
+			if strings.TrimSpace(body.LName) == "" {
 				http.Error(w, "missing required fields", http.StatusBadRequest)
 				return
 			}
 
 			res, err := s.Db.ExecContext(r.Context(), `
-                INSERT INTO loan (authID, lname, fname)
-                VALUES (?, ?, 0)`,
-				body.AuthID, body.LName, body.FName,
+                INSERT INTO authors (lname, fname)
+                VALUES (?, ?)`,
+				body.LName, body.FName,
 			)
 			if err != nil {
 				http.Error(w, "insert failed", http.StatusInternalServerError)
