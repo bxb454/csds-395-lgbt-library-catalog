@@ -1,4 +1,5 @@
-import apiClient from "./client"
+import axios from "axios"
+import { API_BASE } from "./client"
 import type { LoanRecord } from "../assets/Types"
 
 interface BackendLoan {
@@ -19,13 +20,13 @@ const adaptLoan = (loan: BackendLoan): LoanRecord => ({
   renewalCount: loan.numRenewals,
 })
 
-export const fetchLoans = async (): Promise<LoanRecord[]> => {
-  const response = await apiClient.get<BackendLoan[]>("/loans")
+export async function fetchLoans(): Promise<LoanRecord[]> {
+  const response = await axios.get<BackendLoan[]>(`${API_BASE}/loans`)
   return (response.data ?? []).map(adaptLoan)
 }
 
-export const renewLoan = async (loan: LoanRecord) => {
-  await apiClient.patch(`/loans/${loan.loanId}/renew`, {
+export async function renewLoan(loan: LoanRecord) {
+  await axios.patch(`${API_BASE}/loans/${loan.loanId}/renew`, {
     loanID: loan.loanId,
     bookID: loan.bookId,
     caseID: loan.caseID,
@@ -35,18 +36,18 @@ export const renewLoan = async (loan: LoanRecord) => {
   } satisfies BackendLoan)
 }
 
-export const deleteLoan = async (loanId: number) => {
-  await apiClient.delete(`/loans/${loanId}`)
+export async function deleteLoan(loanId: number) {
+  await axios.delete(`${API_BASE}/loans/${loanId}`)
 }
 
-export const createLoan = async (payload: {
+export async function createLoan(payload: {
   bookID: number
   caseID: string
   loanDate: string
   dueDate: string
   numRenewals?: number
-}) => {
-  await apiClient.post("/loans", {
+}) {
+  await axios.post(`${API_BASE}/loans`, {
     bookID: payload.bookID,
     caseID: payload.caseID,
     loanDate: payload.loanDate,

@@ -1,4 +1,5 @@
-import apiClient from "./client"
+import axios from "axios"
+import { API_BASE } from "./client"
 import type { BookData } from "../assets/Types"
 
 interface BackendBook {
@@ -44,34 +45,69 @@ export interface BookWritePayload {
   edition?: string
 }
 
+export interface BookListResult {
+  books: BookData[]
+  pagination: BooksResponse["pagination"]
+  currentPage: number
+  totalPages: number
+}
+
 const adaptBook = (book: BackendBook): BookData => {
   const pubYear = book.pubdate ? Number(book.pubdate.slice(0, 4)) : undefined
   const image =
     book.thumbnail && book.thumbnail.length > 0
       ? `data:image/png;base64,${book.thumbnail}`
       : undefined
+  const loanedCount =
+    typeof book.loanMetrics === "number" && !Number.isNaN(book.loanMetrics)
+      ? book.loanMetrics
+      : 0
+  const available = Math.max(book.copies - loanedCount, 0)
 
   return {
     id: book.id,
     title: book.title,
     copies: book.copies,
-    available: book.copies,
+    available,
     isbn: book.isbn ?? undefined,
-    pubYear:
+  pubYear:
       typeof pubYear === "number" && !Number.isNaN(pubYear) ? pubYear : undefined,
     publisher: book.publisher ?? undefined,
     edition: book.edition ?? undefined,
+    pubdate: book.pubdate ?? undefined,
     image,
   }
 }
 
-export const fetchBooks = async (
+export async function fetchBooks(
   params?: BookFilters,
-): Promise<BookData[]> => {
-  const response = await apiClient.get<BooksResponse>("/books", {
-    params,
+  page = 1,
+  pageSize = 10,
+): Promise<BookListResult> {
+  const safePage = Math.max(page, 1)
+  const offset = (safePage - 1) * pageSize
+
+  const response = await axios.get<BooksResponse>(`${API_BASE}/books`, {
+    params: { ...params, limit: pageSize, offset },
   })
-  return (response.data.data ?? []).map(adaptBook)
+  const pagination =
+    response.data.pagination ?? {
+      limit: pageSize,
+      offset,
+      total: response.data.data?.length ?? 0,
+      hasMore: false,
+    }
+  const totalPages =
+    pagination.total && pageSize > 0
+      ? Math.max(1, Math.ceil(pagination.total / pageSize))
+      : 1
+
+  return {
+    books: (response.data.data ?? []).map(adaptBook),
+    pagination,
+    currentPage: safePage,
+    totalPages,
+  }
 }
 
 const normalizeWritePayload = (payload: BookWritePayload) => ({
@@ -83,54 +119,89 @@ const normalizeWritePayload = (payload: BookWritePayload) => ({
   edition: payload.edition,
 })
 
-export const createBook = async (payload: BookWritePayload) => {
-  const response = await apiClient.post<{ id?: number }>(
-    "/books",
+export async function createBook(payload: BookWritePayload) {
+  const response = await axios.post<{ id?: number }>(
+    `${API_BASE}/books`,
     normalizeWritePayload(payload),
   )
   return response.data?.id
 }
 
-export const updateBook = async (id: number, payload: BookWritePayload) => {
-  await apiClient.put(`/books/${id}`, normalizeWritePayload(payload))
+export async function updateBook(id: number, payload: BookWritePayload) {
+  await axios.put(`${API_BASE}/books/${id}`, normalizeWritePayload(payload))
 }
 
-export const deleteBook = async (id: number) => {
-  await apiClient.delete(`/books/${id}`)
+export async function deleteBook(bookID: number) {
+  await axios.delete(`${API_BASE}/books/${bookID}`)
 }
 
-export const fetchBookById = async (id: number): Promise<BookData> => {
-  const response = await apiClient.get<BackendBook>(`/books/${id}`)
-  return adaptBook(response.data)
+export async function fetchBookById(id: number): Promise<BookData> {
+  const response = await axios.get<BackendBook>(`${API_BASE}/books/${id}`)
+  const base = adaptBook(response.data)
+
+  try {
+    const [authors, tags] = await Promise.all([
+      axios.get<BackendAuthor[]>(`${API_BASE}/books/${id}/authors`).then((res) => res.data).catch(() => []),
+      axios.get<string[]>(`${API_BASE}/books/${id}/tags`).then((res) => res.data).catch(() => []),
+    ])
+
+    const authorNames = Array.isArray(authors)
+      ? authors
+          .map((a) => [a.fname, a.lname].filter(Boolean).join(" ").trim())
+          .filter((name) => name.length > 0)
+      : []
+
+    return {
+      ...base,
+      author: authorNames.join(", "),
+      tags: Array.isArray(tags) ? tags : [],
+    }
+  } catch {
+    return base
+  }
 }
 
-export const fetchBookAuthors = async (id: number) => {
-  const response = await apiClient.get<BackendAuthor[]>(`/books/${id}/authors`)
-  return response.data
-}
+// Convenience helpers matching README_axios naming
+export const getBooks = (
+  page?: number,
+  pageSize?: number,
+) => fetchBooks(undefined, page, pageSize)
 
-export const fetchBookTags = async (id: number) => {
-  const response = await apiClient.get<string[]>(`/books/${id}/tags`)
-  return response.data
-}
+export const searchBooks = (
+  filters: BookFilters,
+  page?: number,
+  pageSize?: number,
+) => fetchBooks(filters, page, pageSize)
 
-export const addBookTag = async (id: number, tag: string) => {
-  await apiClient.post(`/books/${id}/tags`, { tag })
-}
+export const getBook = (bookID: number) => fetchBookById(bookID)
 
-export const deleteBookTag = async (id: number, tag: string) => {
-  await apiClient.delete(
-    `/books/${id}/tags/${encodeURIComponent(tag)}`,
+export async function fetchBookAuthors(id: number) {
+  const response = await axios.get<BackendAuthor[]>(
+    `${API_BASE}/books/${id}/authors`,
   )
+  return response.data
 }
 
-export const addBookAuthor = async (id: number, authID: number) => {
-  await apiClient.post(`/books/${id}/authors`, { authID })
+export async function fetchBookTags(id: number) {
+  const response = await axios.get<string[]>(`${API_BASE}/books/${id}/tags`)
+  return response.data
 }
 
-export const deleteBookAuthor = async (
+export async function addBookTag(id: number, tag: string) {
+  await axios.post(`${API_BASE}/books/${id}/tags`, { tag })
+}
+
+export async function deleteBookTag(id: number, tag: string) {
+  await axios.delete(`${API_BASE}/books/${id}/tags/${encodeURIComponent(tag)}`)
+}
+
+export async function addBookAuthor(id: number, authID: number) {
+  await axios.post(`${API_BASE}/books/${id}/authors`, { authID })
+}
+
+export async function deleteBookAuthor(
   id: number,
   authID: number,
-) => {
-  await apiClient.delete(`/books/${id}/authors/${authID}`)
+) {
+  await axios.delete(`${API_BASE}/books/${id}/authors/${authID}`)
 }

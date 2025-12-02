@@ -1,4 +1,5 @@
-import apiClient from "./client"
+import axios from "axios"
+import { API_BASE } from "./client"
 
 export interface SearchResult {
   type: "book" | "author" | "tag"
@@ -6,14 +7,17 @@ export interface SearchResult {
   name: string
 }
 
-export const searchCatalog = async (query: string, limit = 20) => {
-  const response = await apiClient.get<{ data: SearchResult[] }>("/search", {
-    params: {
-      q: query,
-      limit,
-      offset: 0,
+export async function searchCatalog(query: string, limit = 20) {
+  const response = await axios.get<{ data: SearchResult[] }>(
+    `${API_BASE}/search`,
+    {
+      params: {
+        q: query,
+        limit,
+        offset: 0,
+      },
     },
-  })
+  )
 
   return response.data.data
 }

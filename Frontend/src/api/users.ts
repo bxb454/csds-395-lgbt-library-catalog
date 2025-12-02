@@ -1,4 +1,5 @@
-import apiClient from "./client"
+import axios from "axios"
+import { API_BASE } from "./client"
 import type { UserData } from "../assets/Types"
 
 interface BackendUser {
@@ -7,10 +8,10 @@ interface BackendUser {
   isRestricted: boolean
 }
 
-export const fetchUsers = async (): Promise<UserData[]> => {
-  const response = await apiClient.get<{
+export async function fetchUsers(): Promise<UserData[]> {
+  const response = await axios.get<{
     data: BackendUser[]
-  }>("/users")
+  }>(`${API_BASE}/users`)
 
   return (response.data.data ?? []).map((user) => ({
     caseID: user.caseID,
@@ -19,19 +20,19 @@ export const fetchUsers = async (): Promise<UserData[]> => {
   }))
 }
 
-export const updateUser = async (
+export async function updateUser(
   caseID: string,
   updates: Partial<BackendUser>,
-) => {
-  await apiClient.patch(`/users/${caseID}`, updates)
+) {
+  await axios.patch(`${API_BASE}/users/${caseID}`, updates)
 }
 
-export const createUser = async (
+export async function createUser(
   user: BackendUser,
-) => {
-  await apiClient.post("/users", user)
+) {
+  await axios.post(`${API_BASE}/users`, user)
 }
 
-export const deleteUser = async (caseID: string) => {
-  await apiClient.delete(`/users/${caseID}`)
+export async function deleteUser(caseID: string) {
+  await axios.delete(`${API_BASE}/users/${caseID}`)
 }

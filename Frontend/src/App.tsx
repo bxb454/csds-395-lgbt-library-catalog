@@ -62,7 +62,29 @@ function App() {
     setBooksError(null)
     try {
       const response = await fetchBooks(filters)
-      setBooks(response)
+      const hydrated = await Promise.all(
+        response.books.map(async (book) => {
+          try {
+            const [authors, tags] = await Promise.all([
+              fetchBookAuthors(book.id).catch(() => []),
+              fetchBookTags(book.id).catch(() => []),
+            ])
+            const authorNames = Array.isArray(authors)
+              ? authors
+                  .map((a) => [a.fname, a.lname].filter(Boolean).join(" ").trim())
+                  .filter((name) => name.length > 0)
+              : []
+            return {
+              ...book,
+              author: authorNames.join(", "),
+              tags: Array.isArray(tags) ? tags : [],
+            }
+          } catch {
+            return book
+          }
+        }),
+      )
+      setBooks(hydrated)
     } catch (err) {
       console.error(err)
       setBooksError("Failed to load catalog data.")

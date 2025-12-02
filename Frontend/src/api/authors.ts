@@ -1,4 +1,5 @@
-import apiClient from "./client"
+import axios from "axios"
+import { API_BASE } from "./client"
 
 export interface Author {
   authID: number
@@ -6,14 +7,14 @@ export interface Author {
   fname?: string | null
 }
 
-export const fetchAuthors = async (): Promise<Author[]> => {
-  const response = await apiClient.get<Author[]>("/authors")
+export async function fetchAuthors(): Promise<Author[]> {
+  const response = await axios.get<Author[]>(`${API_BASE}/authors`)
   return response.data ?? []
 }
 
-export const createAuthor = async (
+export async function createAuthor(
   lname: string,
   fname?: string,
-) => {
-  await apiClient.post("/authors", { lname, fname })
+) {
+  await axios.post(`${API_BASE}/authors`, { lname, fname })
 }

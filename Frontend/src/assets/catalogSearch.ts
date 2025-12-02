@@ -1,4 +1,4 @@
-import type { BookData } from "./Types";
+import type { BookData } from "./Types"
 
 export type SearchOption =
   | "general"
@@ -7,7 +7,7 @@ export type SearchOption =
   | "keyword"
   | "isbn"
   | "before date"
-  | "after date";
+  | "after date"
 
 export const searchOptions: SearchOption[] = [
   "general",
@@ -17,7 +17,7 @@ export const searchOptions: SearchOption[] = [
   "isbn",
   "before date",
   "after date",
-];
+]
 
 export function filterBooks(
   books: BookData[],
@@ -28,23 +28,23 @@ export function filterBooks(
   if (!q) return books;
 
   return books.filter((book) => {
-    const title = (book.title || "").toLowerCase();
-    const author = (book.author || "").toLowerCase();
-    const genre = (book.genre || "").toLowerCase();
-    const tags = (book.tags || []).join(" ").toLowerCase();
+    const title = (book.title || "").toLowerCase()
+    const author = (book.author || "").toLowerCase()
+    const genre = (book.genre || "").toLowerCase()
+    const tags = (book.tags || []).join(" ").toLowerCase()
 
     switch (searchBy) {
       case "title":
-        return title.includes(q);
+        return title.includes(q)
       case "author":
         return author.includes(q);
       case "keyword":
-        return genre.includes(q) || tags.includes(q);
+        return genre.includes(q) || tags.includes(q)
       case "isbn":
       case "before date":
       case "after date":
         // placeholder until those fields exist
-        return title.includes(q) || author.includes(q) || genre.includes(q) || tags.includes(q);
+        return title.includes(q) || author.includes(q) || genre.includes(q) || tags.includes(q)
       case "general":
       default:
         return (
@@ -52,7 +52,7 @@ export function filterBooks(
           author.includes(q) ||
           genre.includes(q) ||
           tags.includes(q)
-        );
+        )
     }
-  });
+  })
 }

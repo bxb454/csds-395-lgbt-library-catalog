@@ -12,7 +12,7 @@ import {
   createBook,
   type BookWritePayload,
 } from "../api/books"
-import { fetchAuthors, type Author } from "../api/authors"
+import { createAuthor, fetchAuthors, type Author } from "../api/authors"
 
 type UpdateCatalogTableProps = {
   books: BookData[]
@@ -22,6 +22,26 @@ type UpdateCatalogTableProps = {
 const numberOrDefault = (value: unknown, fallback: number) => {
   const parsed = Number(value)
   return Number.isNaN(parsed) ? fallback : parsed
+}
+
+const normalizeDate = (value: unknown) => {
+  const dateStr = String(value ?? "").trim()
+  if (!dateStr) return undefined
+  //forcing YYYY-MM-DD
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    throw new Error("Publication date must be in YYYY-MM-DD format.")
+  }
+  return dateStr
+}
+
+const parseAuthorName = (raw: string): { fname?: string; lname: string } => {
+  const parts = raw.split(/\s+/).filter(Boolean)
+  if (parts.length <= 1) {
+    return { lname: parts[0] ?? raw }
+  }
+  const lname = parts.pop() ?? ""
+  const fname = parts.join(" ")
+  return { fname: fname || undefined, lname }
 }
 
 const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
@@ -49,6 +69,9 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
     {
       accessorKey: "author",
       header: "Author",
+      muiTableBodyCellEditTextFieldProps: {
+        placeholder: "Author name",
+      },
     },
     {
       accessorKey: "genre",
@@ -80,25 +103,21 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
     },
     {
       accessorKey: "pubdate",
-      header: "Publication Date",
+      header: "Publication Date (YYYY-MM-DD)",
       muiTableBodyCellEditTextFieldProps: {
-        type: "date",
+        type: "text",
+        helperText: "Format: YYYY-MM-DD (e.g., 1993-01-01)",
+        inputProps: {
+          placeholder: "YYYY-MM-DD (e.g., 1993-01-01)",
+          inputMode: "numeric",
+          pattern: "\\d{4}-\\d{2}-\\d{2}",
+        },
+        InputLabelProps: { shrink: true },
       },
     },
     {
       accessorKey: "isbn",
       header: "ISBN",
-    },
-    {
-      accessorKey: "author",
-      header: "Author",
-      muiTableBodyCellEditTextFieldProps: {
-        placeholder: "Author name",
-      },
-    },
-    {
-      accessorKey: "genre",
-      header: "Genre",
     },
     {
       accessorFn: (row) =>
@@ -138,13 +157,20 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
         setError("Copies must be greater than 0.")
         return
       }
+      let normalizedPubdate: string | undefined
+      try {
+        normalizedPubdate = normalizeDate(values.pubdate)
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Invalid publication date.")
+        return
+      }
       const payload: BookWritePayload = {
         title: values.title || "Untitled",
         copies,
         isbn: values.isbn ? String(values.isbn) : undefined,
         publisher: values.publisher,
         edition: values.edition,
-        pubdate: values.pubdate,
+        pubdate: normalizedPubdate,
       }
 
       const authorNames = values.author
@@ -165,38 +191,90 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
 
       try {
         setIsSaving(true)
+        let latestAuthors = authors
+
+        // Ensure authors exist before creating the book
+        const matchedAuthors: Author[] = []
+        const unmatchedAuthors: string[] = []
+
+        for (const name of authorNames) {
+          const findMatch = (list: Author[]) =>
+            list.find((author) => {
+              const fullName = [author.fname, author.lname]
+                .filter(Boolean)
+                .join(" ")
+                .trim()
+                .toLowerCase()
+              return fullName === name.toLowerCase()
+            })
+
+          let match = findMatch(latestAuthors)
+          if (!match) {
+            try {
+              const parsed = parseAuthorName(name)
+              await createAuthor(parsed.lname, parsed.fname)
+              const refreshed = await fetchAuthors()
+              latestAuthors = refreshed
+              setAuthors(refreshed)
+              match = findMatch(refreshed)
+            } catch (err) {
+              console.error("Failed to auto-create author", err)
+              const message =
+                err instanceof Error && err.message
+                  ? err.message
+                  : "Author creation failed. Please retry with a valid name."
+              setError(message)
+              setIsSaving(false)
+              return
+            }
+          }
+
+          if (match) {
+            matchedAuthors.push(match)
+          } else {
+            unmatchedAuthors.push(name)
+          }
+        }
+
+        if (unmatchedAuthors.length > 0) {
+          setError(`Unable to match authors: ${unmatchedAuthors.join(", ")}`)
+          setIsSaving(false)
+          return
+        }
+
         const newId = await createBook(payload)
         table.setCreatingRow(null)
-        let unmatchedAuthors: string[] = []
+
         if (newId) {
           await Promise.all([
-            ...tagInput.map((tag) => addBookTag(newId, tag)),
-            ...authorNames.map(async (name) => {
-              const match = authors.find((author) => {
-                const fullName = [author.fname, author.lname]
-                  .filter(Boolean)
-                  .join(" ")
-                  .trim()
-                  .toLowerCase()
-                return fullName === name.toLowerCase()
-              })
-              if (match) {
-                await addBookAuthor(newId, match.authID)
-              } else {
-                unmatchedAuthors.push(name)
-              }
-            }),
+            ...tagInput.map((tag) =>
+              addBookTag(newId, tag).catch((err) => {
+                console.error("Failed to add tag", err)
+                throw new Error(`Failed to add tag "${tag}"`)
+              }),
+            ),
+            ...matchedAuthors.map((author) =>
+              addBookAuthor(newId, author.authID).catch((err) => {
+                console.error("Failed to link author", err)
+                throw new Error(
+                  `Failed to link author ${[author.fname, author.lname]
+                    .filter(Boolean)
+                    .join(" ")
+                    .trim()}`,
+                )
+              }),
+            ),
           ])
         }
         await onRefreshBooks()
-        if (unmatchedAuthors.length > 0) {
-          setError(`Unable to match authors: ${unmatchedAuthors.join(", ")}`)
-        } else {
-          setError(null)
-        }
+        setError(null)
       } catch (err) {
         console.error(err)
-        setError("Failed to add book. Please try again.")
+        const message =
+          err instanceof Error && err.message
+            ? err.message
+            : "Failed to add book. Please try again."
+        setError(message)
       } finally {
         setIsSaving(false)
       }
