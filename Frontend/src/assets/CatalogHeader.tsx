@@ -69,7 +69,7 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
     { title: "Catalog Search", page: "catalog", visible: true },
     { title: "My Loans", page: "myloans", visible: true },
     { title: "All Loans", page: "allloans", visible: role === "staff" || role === "admin" },
-    { title: "Update Catalog", page: "updatecatalog", visible: role === "staff" || role === "admin" },
+    { title: "Add to Catalog", page: "updatecatalog", visible: role === "staff" || role === "admin" },
     { title: "Staff Roles", page: "staffroles", visible: role === "admin" },
   ];
 
@@ -181,7 +181,7 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
             <span style={{ fontSize: "18px", fontWeight: 500 }}>
               {currentPage === "myloans" && "My Loans"}
               {currentPage === "allloans" && "All Loans"}
-              {currentPage === "updatecatalog" && "Update Catalog"}
+              {currentPage === "updatecatalog" && "Add to Catalog"}
               {currentPage === "staffroles" && "Staff Roles"}
             </span>
           )}

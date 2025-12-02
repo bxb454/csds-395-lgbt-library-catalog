@@ -51,6 +51,17 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [authors, setAuthors] = useState<Author[]>([])
+  const [newBook, setNewBook] = useState({
+    title: "",
+    author: "",
+    genre: "",
+    copies: "",
+    publisher: "",
+    edition: "",
+    pubdate: "",
+    isbn: "",
+    tags: "",
+  })
 
   useEffect(() => {
     fetchAuthors()
@@ -134,151 +145,151 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
     },
   ], [])
 
+  const handleCreate = async () => {
+    setError(null)
+    const copies = numberOrDefault(newBook.copies, 0)
+    if (copies <= 0) {
+      setError("Copies must be greater than 0.")
+      return
+    }
+
+    let normalizedPubdate: string | undefined
+    try {
+      normalizedPubdate = normalizeDate(newBook.pubdate)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Invalid publication date.")
+      return
+    }
+
+    const payload: BookWritePayload = {
+      title: newBook.title || "Untitled",
+      copies,
+      isbn: newBook.isbn ? String(newBook.isbn) : undefined,
+      publisher: newBook.publisher,
+      edition: newBook.edition,
+      pubdate: normalizedPubdate,
+    }
+
+    const authorNames = newBook.author
+      ? newBook.author
+          .split(",")
+          .map((name) => name.trim())
+          .filter((name) => name.length > 0)
+      : []
+    const tagInput = newBook.tags
+      ? newBook.tags
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter((tag) => tag.length > 0)
+      : []
+    if (newBook.genre) {
+      tagInput.push(newBook.genre.trim())
+    }
+
+    try {
+      setIsSaving(true)
+      let latestAuthors = authors
+
+      const matchedAuthors: Author[] = []
+      const unmatchedAuthors: string[] = []
+
+      for (const name of authorNames) {
+        const findMatch = (list: Author[]) =>
+          list.find((author) => {
+            const fullName = [author.fname, author.lname]
+              .filter(Boolean)
+              .join(" ")
+              .trim()
+              .toLowerCase()
+            return fullName === name.toLowerCase()
+          })
+
+        let match = findMatch(latestAuthors)
+        if (!match) {
+          try {
+            const parsed = parseAuthorName(name)
+            await createAuthor(parsed.lname, parsed.fname)
+            const refreshed = await fetchAuthors()
+            latestAuthors = refreshed
+            setAuthors(refreshed)
+            match = findMatch(refreshed)
+          } catch (err) {
+            console.error("Failed to auto-create author", err)
+            const message =
+              err instanceof Error && err.message
+                ? err.message
+                : "Author creation failed. Please retry with a valid name."
+            setError(message)
+            setIsSaving(false)
+            return
+          }
+        }
+
+        if (match) {
+          matchedAuthors.push(match)
+        } else {
+          unmatchedAuthors.push(name)
+        }
+      }
+
+      if (unmatchedAuthors.length > 0) {
+        setError(`Unable to match authors: ${unmatchedAuthors.join(", ")}`)
+        setIsSaving(false)
+        return
+      }
+
+      const newId = await createBook(payload)
+
+      if (newId) {
+        await Promise.all([
+          ...tagInput.map((tag) =>
+            addBookTag(newId, tag).catch((err) => {
+              console.error("Failed to add tag", err)
+              throw new Error(`Failed to add tag "${tag}"`)
+            }),
+          ),
+          ...matchedAuthors.map((author) =>
+            addBookAuthor(newId, author.authID).catch((err) => {
+              console.error("Failed to link author", err)
+              throw new Error(
+                `Failed to link author ${[author.fname, author.lname]
+                  .filter(Boolean)
+                  .join(" ")
+                  .trim()}`,
+              )
+            }),
+          ),
+        ])
+      }
+      await onRefreshBooks()
+      setError(null)
+      setNewBook({
+        title: "",
+        author: "",
+        genre: "",
+        copies: "",
+        publisher: "",
+        edition: "",
+        pubdate: "",
+        isbn: "",
+        tags: "",
+      })
+    } catch (err) {
+      console.error(err)
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : "Failed to add book. Please try again."
+      setError(message)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const table = useMaterialReactTable({
     columns,
     data: books,
     enableEditing: false,
-    renderTopToolbarCustomActions: ({ table }) => (
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={() => table.setCreatingRow(true)}
-        disabled={isSaving}
-      >
-        Add Book
-      </Button>
-    ),
-    editDisplayMode: "modal",
-    createDisplayMode: "modal",
-    onCreatingRowSave: async ({ values, table }) => {
-      setError(null)
-      const copies = numberOrDefault(values.copies, 0)
-      if (copies <= 0) {
-        setError("Copies must be greater than 0.")
-        return
-      }
-      let normalizedPubdate: string | undefined
-      try {
-        normalizedPubdate = normalizeDate(values.pubdate)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Invalid publication date.")
-        return
-      }
-      const payload: BookWritePayload = {
-        title: values.title || "Untitled",
-        copies,
-        isbn: values.isbn ? String(values.isbn) : undefined,
-        publisher: values.publisher,
-        edition: values.edition,
-        pubdate: normalizedPubdate,
-      }
-
-      const authorNames = values.author
-        ? String(values.author)
-            .split(",")
-            .map((name) => name.trim())
-            .filter((name) => name.length > 0)
-        : []
-      const tagInput = values.tags
-        ? String(values.tags)
-            .split(",")
-            .map((tag) => tag.trim())
-            .filter((tag) => tag.length > 0)
-        : []
-      if (values.genre) {
-        tagInput.push(String(values.genre).trim())
-      }
-
-      try {
-        setIsSaving(true)
-        let latestAuthors = authors
-
-        // Ensure authors exist before creating the book
-        const matchedAuthors: Author[] = []
-        const unmatchedAuthors: string[] = []
-
-        for (const name of authorNames) {
-          const findMatch = (list: Author[]) =>
-            list.find((author) => {
-              const fullName = [author.fname, author.lname]
-                .filter(Boolean)
-                .join(" ")
-                .trim()
-                .toLowerCase()
-              return fullName === name.toLowerCase()
-            })
-
-          let match = findMatch(latestAuthors)
-          if (!match) {
-            try {
-              const parsed = parseAuthorName(name)
-              await createAuthor(parsed.lname, parsed.fname)
-              const refreshed = await fetchAuthors()
-              latestAuthors = refreshed
-              setAuthors(refreshed)
-              match = findMatch(refreshed)
-            } catch (err) {
-              console.error("Failed to auto-create author", err)
-              const message =
-                err instanceof Error && err.message
-                  ? err.message
-                  : "Author creation failed. Please retry with a valid name."
-              setError(message)
-              setIsSaving(false)
-              return
-            }
-          }
-
-          if (match) {
-            matchedAuthors.push(match)
-          } else {
-            unmatchedAuthors.push(name)
-          }
-        }
-
-        if (unmatchedAuthors.length > 0) {
-          setError(`Unable to match authors: ${unmatchedAuthors.join(", ")}`)
-          setIsSaving(false)
-          return
-        }
-
-        const newId = await createBook(payload)
-        table.setCreatingRow(null)
-
-        if (newId) {
-          await Promise.all([
-            ...tagInput.map((tag) =>
-              addBookTag(newId, tag).catch((err) => {
-                console.error("Failed to add tag", err)
-                throw new Error(`Failed to add tag "${tag}"`)
-              }),
-            ),
-            ...matchedAuthors.map((author) =>
-              addBookAuthor(newId, author.authID).catch((err) => {
-                console.error("Failed to link author", err)
-                throw new Error(
-                  `Failed to link author ${[author.fname, author.lname]
-                    .filter(Boolean)
-                    .join(" ")
-                    .trim()}`,
-                )
-              }),
-            ),
-          ])
-        }
-        await onRefreshBooks()
-        setError(null)
-      } catch (err) {
-        console.error(err)
-        const message =
-          err instanceof Error && err.message
-            ? err.message
-            : "Failed to add book. Please try again."
-        setError(message)
-      } finally {
-        setIsSaving(false)
-      }
-    },
     muiTableBodyRowProps: { sx: { height: 72 } },
     muiTableBodyCellProps: {
       sx: {
@@ -302,8 +313,86 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
 
   return (
     <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
-      <Box sx={{ width: "900px", border: "1px solid #999" }}>
-        <MaterialReactTable table={table} />
+      <Box sx={{ width: "900px", border: "1px solid #999", p: 2 }}>
+        <h3 style={{ marginTop: 0 }}>Add a New Book</h3>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "12px",
+            marginBottom: "16px",
+          }}
+        >
+          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+            Title
+            <input
+              value={newBook.title}
+              onChange={(e) => setNewBook({ ...newBook, title: e.target.value })}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+            Author(s) (comma separated)
+            <input
+              value={newBook.author}
+              onChange={(e) => setNewBook({ ...newBook, author: e.target.value })}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+            Genre
+            <input
+              value={newBook.genre}
+              onChange={(e) => setNewBook({ ...newBook, genre: e.target.value })}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+            Copies
+            <input
+              type="number"
+              min={0}
+              value={newBook.copies}
+              onChange={(e) => setNewBook({ ...newBook, copies: e.target.value })}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+            Publisher
+            <input
+              value={newBook.publisher}
+              onChange={(e) => setNewBook({ ...newBook, publisher: e.target.value })}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+            Edition
+            <input
+              value={newBook.edition}
+              onChange={(e) => setNewBook({ ...newBook, edition: e.target.value })}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+            Publication Date
+            <input
+              placeholder="YYYY-MM-DD"
+              value={newBook.pubdate}
+              onChange={(e) => setNewBook({ ...newBook, pubdate: e.target.value })}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+            ISBN
+            <input
+              value={newBook.isbn}
+              onChange={(e) => setNewBook({ ...newBook, isbn: e.target.value })}
+            />
+          </label>
+          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+            Tags (comma separated)
+            <input
+              value={newBook.tags}
+              onChange={(e) => setNewBook({ ...newBook, tags: e.target.value })}
+            />
+          </label>
+        </div>
+        <Button variant="contained" onClick={handleCreate} disabled={isSaving}>
+          {isSaving ? "Saving..." : "Add Book"}
+        </Button>
         {error && (
           <Box
             sx={{
