@@ -16,8 +16,7 @@ const LoginButton: React.FC<LoginButtonProps> = ({
   onLogout,
 }) => {
   const handleLogin = () => {
-    // onLogin()
-    // window.location.replace(CAS_LOGIN_URL)
+    window.location.replace(CAS_LOGIN_URL)
   };
 
   return (

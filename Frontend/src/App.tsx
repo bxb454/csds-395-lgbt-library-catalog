@@ -193,9 +193,9 @@ function App() {
   }, [availableUsers, currentUser])
 
   const handleLogin = () => {
-    const fallback = availableUsers[0] ?? null
-    setCurrentUser(fallback)
-    setIsLoggedIn(Boolean(fallback))
+    window.location.replace(
+      "https://login.case.edu/cas/login?service=http://lgbt-cat.case.edu",
+    )
   };
 
   const handleLogout = () => {
