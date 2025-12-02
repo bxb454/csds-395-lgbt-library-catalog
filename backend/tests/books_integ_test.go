@@ -232,4 +232,14 @@ func TestBooksDelete(t *testing.T) {
 		t.Fatalf("Expected status 204, got %d. Body: %s", delResp.StatusCode, string(bodyBytes))
 	}
 
+	//we need to check deletion
+	var count int
+	err = testDB.QueryRow("SELECT COUNT(*) FROM books WHERE bookID = ?", response.ID).Scan(&count)
+	if err != nil {
+		t.Fatalf("failed to verify deletion: %v", err)
+	}
+	if count != 0 {
+		t.Errorf("expected 0 books, got %d", count)
+	}
+
 }

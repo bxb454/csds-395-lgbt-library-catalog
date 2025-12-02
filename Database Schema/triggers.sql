@@ -17,6 +17,6 @@ AFTER DELETE ON bookauthor
 FOR EACH ROW
 BEGIN
 	IF NOT EXISTS (SELECT * FROM bookauthor WHERE authID = OLD.authID) THEN
-		DELETE FROM author WHERE authID = OLD.authID;
+		DELETE FROM authors WHERE authID = OLD.authID;
 	END IF;
 END//

@@ -53,7 +53,7 @@ func TestMain(m *testing.M) {
 		panic(fmt.Sprintf("failed to get the dummy script path: %v", err))
 	}
 
-	triggerPath, err := filepath.Abs("../../Database Schema/triggers.sql")
+	triggerPath, err := filepath.Abs("triggers_integ.sql")
 	if err != nil {
 		panic(fmt.Sprintf("failed to get the trigger script path: %v", err))
 	}
