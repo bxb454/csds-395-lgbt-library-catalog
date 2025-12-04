@@ -1,7 +1,6 @@
 import React from 'react'
 
-const CAS_LOGIN_URL =
-  "https://login.case.edu/cas/login?service=http://lgbt-cat.case.edu"
+
 
 type LoginButtonProps = {
   isLoggedIn: boolean
@@ -12,11 +11,11 @@ type LoginButtonProps = {
 //const LoginButton: React.FC = () => {
 const LoginButton: React.FC<LoginButtonProps> = ({
   isLoggedIn,
-  onLogin,
   onLogout,
 }) => {
   const handleLogin = () => {
-    window.location.replace(CAS_LOGIN_URL)
+    // onLogin()
+    // window.location.replace(CAS_LOGIN_URL)
   };
 
   return (
@@ -39,7 +38,7 @@ import React from 'react';
   const CAS_LOGIN = `https://login.case.edu/cas/login?service=${SERVICE_URL}`;
   const CAS_LOGOUT = 'https://login.case.edu/cas/logout';
 
-  const handleSignIn = () => {
+  const handleSignInd = () => {
      window.location.href = CAS_LOGIN;
     };
 

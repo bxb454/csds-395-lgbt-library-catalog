@@ -1,10 +1,5 @@
-import {
-  MaterialReactTable,
-  type MRT_ColumnDef,
-  useMaterialReactTable,
-} from "material-react-table"
 import { Box, Button } from "@mui/material"
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import type { BookData } from "./Types"
 import {
   addBookAuthor,
@@ -45,7 +40,6 @@ const parseAuthorName = (raw: string): { fname?: string; lname: string } => {
 }
 
 const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
-  books,
   onRefreshBooks,
 }) => {
   const [isSaving, setIsSaving] = useState(false)
@@ -71,80 +65,6 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
         console.error(err)
       })
   }, [])
-
-  const columns = useMemo<MRT_ColumnDef<BookData>[]>(() => [
-    {
-      accessorKey: "title",
-      header: "Title",
-      size: 250,
-    },
-    {
-      accessorKey: "author",
-      header: "Author",
-      muiTableBodyCellEditTextFieldProps: {
-        placeholder: "Author name",
-      },
-    },
-    {
-      accessorKey: "genre",
-      header: "Genre",
-    },
-    {
-      accessorKey: "copies",
-      header: "Copies",
-      muiTableBodyCellEditTextFieldProps: {
-        type: "number",
-        inputProps: { min: 0 },
-      },
-    },
-    {
-      accessorKey: "loanMetrics",
-      header: "Checked Out",
-      muiTableBodyCellEditTextFieldProps: {
-        type: "number",
-        inputProps: { min: 0 },
-      },
-    },
-    {
-      accessorKey: "publisher",
-      header: "Publisher",
-    },
-    {
-      accessorKey: "edition",
-      header: "Edition",
-    },
-    {
-      accessorKey: "pubdate",
-      header: "Publication Date (YYYY-MM-DD)",
-      muiTableBodyCellEditTextFieldProps: {
-        type: "text",
-        helperText: "Format: YYYY-MM-DD (e.g., 1993-01-01)",
-        inputProps: {
-          placeholder: "YYYY-MM-DD (e.g., 1993-01-01)",
-          inputMode: "numeric",
-          pattern: "\\d{4}-\\d{2}-\\d{2}",
-        },
-        InputLabelProps: { shrink: true },
-      },
-    },
-    {
-      accessorKey: "isbn",
-      header: "ISBN",
-    },
-    {
-      accessorFn: (row) =>
-        Array.isArray(row.tags)
-          ? row.tags.join(", ")
-          : typeof row.tags === "string"
-            ? row.tags
-            : "",
-      id: "tags",
-      header: "Tags",
-      muiTableBodyCellEditTextFieldProps: {
-        placeholder: "comma separated",
-      },
-    },
-  ], [])
 
   const handleCreate = async () => {
     setError(null)
@@ -286,31 +206,6 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
       setIsSaving(false)
     }
   }
-
-  const table = useMaterialReactTable({
-    columns,
-    data: books,
-    enableEditing: false,
-    muiTableBodyRowProps: { sx: { height: 72 } },
-    muiTableBodyCellProps: {
-      sx: {
-        borderRight: "1px solid #999",
-        borderBottom: "1px solid #999",
-        "&:last-of-type": { borderRight: "none" },
-      },
-    },
-    muiTableHeadCellProps: {
-      sx: {
-        borderRight: "1px solid #999",
-        borderBottom: "1px solid #999",
-        "&:last-of-type": { borderRight: "none" },
-      },
-    },
-    muiTablePaperProps: {
-      elevation: 0,
-      sx: { borderRadius: 0, boxShadow: "none" },
-    },
-  })
 
   return (
     <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>

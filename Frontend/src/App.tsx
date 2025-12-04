@@ -304,7 +304,7 @@ function App() {
       </header>
 
      {/* Temp debug login */}
-      <div style={{ margin: "1rem", display: "none" }}>
+      <div style={{ margin: "1rem" }}>
         <label style={{ marginRight: "10px", fontWeight: 600 }}>
           Debug login:
         </label>
@@ -328,7 +328,8 @@ function App() {
           style={{
             padding: "6px",
             fontSize: "14px",
-            border: "1px solid #777",
+            border: "1px solid " +
+              " #777",
           }}
         >
           <option value="">Log out</option>
