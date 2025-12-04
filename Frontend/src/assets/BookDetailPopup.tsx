@@ -224,6 +224,7 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
           width: "750px",
           backgroundColor: "white",
           border: "2px solid #777",
+          color: "black",
           padding: "30px",
           display: "grid",
           gridTemplateColumns: "1fr 240px",
