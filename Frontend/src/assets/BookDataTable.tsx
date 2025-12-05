@@ -69,6 +69,8 @@ const BookDataTable = ({
     const [editForm, setEditForm] = useState<EditFormState | null>(null)
     const [authorsByBook, setAuthorsByBook] = useState<Record<number, string>>({})
     const [tagsByBook, setTagsByBook] = useState<Record<number, string[]>>({})
+    const [authorsLoading, setAuthorsLoading] = useState(false)
+    const [tagsLoading, setTagsLoading] = useState(false)
     const [pendingDelete, setPendingDelete] = useState<BookData | null>(null)
     const FETCH_DELAY_MS = 120
     const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
@@ -201,9 +203,13 @@ const BookDataTable = ({
                 !(b.id in authorsByBook) &&
                 (!b.author || b.author.length === 0),
         )
-        if (missing.length === 0) return
+        if (missing.length === 0) {
+            setAuthorsLoading(false)
+            return
+        }
 
         const fetchAll = async () => {
+            setAuthorsLoading(true)
             const entries: Array<[number, string]> = []
             for (const book of missing) {
                 try {
@@ -228,6 +234,7 @@ const BookDataTable = ({
                 }
                 return next
             })
+            setAuthorsLoading(false)
         }
 
         void fetchAll()
@@ -237,12 +244,15 @@ const BookDataTable = ({
         const missing = books.filter(
             (b) =>
                 !(b.id in tagsByBook) &&
-                (!b.tags || b.tags.length === 0) &&
                 b.id !== undefined,
         )
-        if (missing.length === 0) return
+        if (missing.length === 0) {
+            setTagsLoading(false)
+            return
+        }
 
         const fetchAll = async () => {
+            setTagsLoading(true)
             const entries: Array<[number, string[]]> = []
             for (const book of missing) {
                 try {
@@ -261,6 +271,7 @@ const BookDataTable = ({
                 }
                 return next
             })
+            setTagsLoading(false)
         }
 
         void fetchAll()
@@ -554,7 +565,9 @@ const BookDataTable = ({
         },
     })
 
-    if (loading) {
+    const metaLoading = authorsLoading || tagsLoading
+
+    if (loading || metaLoading) {
         return (
             <Box sx={{ width: "100%", display: "flex", justifyContent: "center", mt: 4 }}>
                 <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
