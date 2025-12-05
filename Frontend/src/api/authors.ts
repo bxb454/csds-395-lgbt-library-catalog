@@ -22,7 +22,7 @@ type BackendAuthor =
 const adaptAuthor = (author: BackendAuthor): Author => ({
   authID: "AuthID" in author ? author.AuthID : author.authID,
   lname: "LName" in author ? author.LName : author.lname,
-  fname: "FName" in author ? author.FName : author.fname,
+  fname: "FName" in author ? author.FName : "fname" in author ? author.fname : null,
 })
 
 export async function fetchAuthors(): Promise<Author[]> {

@@ -103,6 +103,7 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({
         id: nextId,
         caseID: trimmedCase,
         role: roleInput,
+        isRestricted: false,
       }
       feedback = `Assigned ${trimmedCase} the ${roleInput} role.`
       return [...prevAssignments, created]
