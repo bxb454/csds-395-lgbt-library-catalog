@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
-	//"strings"
+	"strings"
 
 	cas_auth "gopkg.in/cas.v2"
 )
@@ -53,16 +53,18 @@ func RunCASServer(port string) {
 	mux.HandleFunc("/login", func (w http.ResponseWriter, r *http.Request) {
 		// Look for a ticket in the query section of the URL, this indicates the user has returned from the CAS redirect
 		//fmt.Println(r.URL) // these printlns can be removed after function and testing is completed
-		cas_auth.RedirectToLogin(w, r)
+		//cas_auth.RedirectToLogin(w, r)
+		http.RedirectHandler("https://login.case.edu/cas/login?service=https://lgbt-cat.ugen.case.edu:8080/", http.StatusTemporaryRedirect)
 		user := cas_auth.Username(r)
 		fmt.Println(user)
-		/*cas_url, _ := url.Parse("httpd://lgbt-cat.case.edu" + r.URL.String())
+		//w.Header().Set()
+		cas_url, _ := url.Parse("https://lgbt-cat.ugen.case.edu" + r.URL.String())
 		query := cas_url.RawQuery
 		//fmt.Println(query)
 		if ticket := strings.Split(query, "ticket=")[1]; ticket != "" { 
-			resp, _ := http.Get("https://login.case.edu/cas/serviceValidate?ticket=" + ticket + "&amp;service=httpd://lgbt-cat.case.edu/login")
+			resp, _ := http.Get("https://login.case.edu/cas/serviceValidate?ticket=" + ticket + "&amp;service=https://lgbt-cat.ugen.case.edu/login")
 			fmt.Println(resp.Body)
-		}*/
+		}
 	})
 
 	// Create CAS client middleware
