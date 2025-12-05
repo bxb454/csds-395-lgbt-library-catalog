@@ -245,7 +245,17 @@ func (s *Server) HandleBookByID() http.Handler {
 				return
 			}
 			if rows, _ := res.RowsAffected(); rows == 0 {
-				http.NotFound(w, r)
+				//If nothing changed, see if the book still exists before 404 err
+				exists, err := s.bookExists(r.Context(), id)
+				if err != nil {
+					http.Error(w, "query failed", http.StatusInternalServerError)
+					return
+				}
+				if !exists {
+					http.NotFound(w, r)
+					return
+				}
+				w.WriteHeader(http.StatusNoContent)
 				return
 			}
 			w.WriteHeader(http.StatusNoContent)
@@ -266,6 +276,18 @@ func (s *Server) HandleBookByID() http.Handler {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+}
+
+// created to check if a bookID exists
+func (s *Server) bookExists(ctx context.Context, id string) (bool, error) {
+	var exists int
+	if err := s.Db.QueryRowContext(ctx, `SELECT 1 FROM books WHERE bookID = ?`, id).Scan(&exists); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
 }
 
 func (s *Server) HandleBookTags(w http.ResponseWriter, r *http.Request, bookID string) {

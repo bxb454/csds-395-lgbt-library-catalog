@@ -427,7 +427,8 @@ const BookDataTable = ({
             desired.push(genre.trim())
         }
 
-        const current = await fetchBookTags(bookId).catch(() => [] as string[])
+        const currentRaw = await fetchBookTags(bookId).catch(() => null as string[] | null)
+        const current = Array.isArray(currentRaw) ? currentRaw : []
 
         for (const tag of current) {
             if (!desired.includes(tag)) {
@@ -468,6 +469,17 @@ const BookDataTable = ({
             await updateBook(editForm.id, buildWritePayload(editForm, copies))
             await reconcileAuthors(editForm.id, editForm.author)
             await reconcileTags(editForm.id, editForm.tagsInput, editForm.genre)
+            // clear cached authors & tags for refetched updated values
+            setAuthorsByBook((prev) => {
+                const next = { ...prev }
+                delete next[editForm.id]
+                return next
+            })
+            setTagsByBook((prev) => {
+                const next = { ...prev }
+                delete next[editForm.id]
+                return next
+            })
             await onRefreshBooks()
             setEditForm(null)
         } catch (err) {
