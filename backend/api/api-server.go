@@ -75,7 +75,7 @@ func New() (*Server, error) {
 		Db:           db,
 		router:       http.NewServeMux(),
 		limiters:     make(map[string]*rate.Limiter),
-		rateInterval: 100 * time.Millisecond,
+		rateInterval: time.Second / 10,
 		rateBurst:    10,
 	}
 

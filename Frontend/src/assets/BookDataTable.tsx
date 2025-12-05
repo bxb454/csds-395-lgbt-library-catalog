@@ -70,6 +70,7 @@ const BookDataTable = ({
     const [authorsByBook, setAuthorsByBook] = useState<Record<number, string>>({})
     const [tagsByBook, setTagsByBook] = useState<Record<number, string[]>>({})
     const [pendingDelete, setPendingDelete] = useState<BookData | null>(null)
+    const FETCH_DELAY_MS = 120
     const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
     const parseAuthorName = (raw: string): { fname?: string; lname: string } => {
         const parts = raw.split(/\s+/).filter(Boolean)
@@ -161,7 +162,7 @@ const BookDataTable = ({
                     const copiesLabel = book.copies === 1 ? "copy" : "copies"
 
                     const tagsList =
-                        tagsByBook[book.id] && tagsByBook[book.id].length > 0
+                        Object.prototype.hasOwnProperty.call(tagsByBook, book.id)
                             ? tagsByBook[book.id]
                             : book.tags
                     const tagsText =
@@ -186,7 +187,7 @@ const BookDataTable = ({
                 },
             },
         ],
-        [authorsByBook]
+        [authorsByBook, tagsByBook]
     )
 
     const filteredData = useMemo(
@@ -196,7 +197,9 @@ const BookDataTable = ({
 
     useEffect(() => {
         const missing = books.filter(
-            (b) => !authorsByBook[b.id] && (!b.author || b.author.length === 0),
+            (b) =>
+                !(b.id in authorsByBook) &&
+                (!b.author || b.author.length === 0),
         )
         if (missing.length === 0) return
 
@@ -216,12 +219,12 @@ const BookDataTable = ({
                 } catch {
                     entries.push([book.id, ""])
                 }
-                await sleep(50)
+                await sleep(FETCH_DELAY_MS)
             }
             setAuthorsByBook((prev) => {
                 const next = { ...prev }
                 for (const [id, names] of entries) {
-                    if (names) next[id] = names
+                    next[id] = names
                 }
                 return next
             })
@@ -233,7 +236,7 @@ const BookDataTable = ({
     useEffect(() => {
         const missing = books.filter(
             (b) =>
-                !tagsByBook[b.id] &&
+                !(b.id in tagsByBook) &&
                 (!b.tags || b.tags.length === 0) &&
                 b.id !== undefined,
         )
@@ -249,12 +252,12 @@ const BookDataTable = ({
                 } catch {
                     entries.push([book.id, []])
                 }
-                await sleep(50)
+                await sleep(FETCH_DELAY_MS)
             }
             setTagsByBook((prev) => {
                 const next: Record<number, string[]> = { ...prev }
                 for (const [id, tags] of entries) {
-                    if (tags.length > 0) next[id] = [...tags]
+                    next[id] = [...tags]
                 }
                 return next
             })

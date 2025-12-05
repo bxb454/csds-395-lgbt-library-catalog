@@ -156,9 +156,13 @@ export async function deleteBook(bookID: number) {
   await axios.delete(`${API_BASE}/books/${bookID}`)
 }
 
-export async function fetchBookById(id: number): Promise<BookData> {
+export async function fetchBookBaseById(id: number): Promise<BookData> {
   const response = await axios.get<BackendBook>(`${API_BASE}/books/${id}`)
-  const base = adaptBook(response.data)
+  return adaptBook(response.data)
+}
+
+export async function fetchBookById(id: number): Promise<BookData> {
+  const base = await fetchBookBaseById(id)
 
   try {
     const [authors, tags] = await Promise.all([
@@ -180,7 +184,7 @@ export async function fetchBookById(id: number): Promise<BookData> {
       author: authorNames.join(", "),
       tags: Array.isArray(tags) ? tags : [],
     }
-} catch {
+  } catch {
     return base
   }
 }

@@ -14,7 +14,7 @@ import StaffRolesTable from "./assets/StaffRolesTable.tsx"
 
 import type { BookData, LoanRecord } from "./assets/Types.ts"
 import { sampleUsers } from "./assets/sampleUsers.tsx"
-import { fetchBooks, fetchBookById, fetchBookAuthors, fetchBookTags, type BookFilters } from "./api/books"
+import { fetchBooks, fetchBookBaseById, type BookFilters } from "./api/books"
 import { fetchLoans, deleteLoan, renewLoan } from "./api/loans"
 import { createUser, deleteUser, fetchUsers, updateUser } from "./api/users"
 import { searchCatalog } from "./api/search"
@@ -62,29 +62,7 @@ function App() {
     setBooksError(null)
     try {
       const response = await fetchBooks(filters)
-      const hydrated = await Promise.all(
-        response.books.map(async (book) => {
-          try {
-            const [authors, tags] = await Promise.all([
-              fetchBookAuthors(book.id).catch(() => []),
-              fetchBookTags(book.id).catch(() => []),
-            ])
-            const authorNames = Array.isArray(authors)
-              ? authors
-                  .map((a) => [a.fname, a.lname].filter(Boolean).join(" ").trim())
-                  .filter((name) => name.length > 0)
-              : []
-            return {
-              ...book,
-              author: authorNames.join(", "),
-              tags: Array.isArray(tags) ? tags : [],
-            }
-          } catch {
-            return book
-          }
-        }),
-      )
-      setBooks(hydrated)
+      setBooks(response.books)
     } catch (err) {
       console.error(err)
       setBooksError("Failed to load catalog data.")
@@ -133,7 +111,9 @@ function App() {
       if (bookIds.length === 0) {
         setBooks([])
       } else {
-        const fetched = await Promise.all(bookIds.map((id) => fetchBookById(id)))
+        const fetched = await Promise.all(
+          bookIds.map((id) => fetchBookBaseById(id)),
+        )
         setBooks(fetched)
       }
     } catch (err) {
