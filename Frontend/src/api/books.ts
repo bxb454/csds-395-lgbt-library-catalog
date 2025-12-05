@@ -103,7 +103,7 @@ const adaptBook = (book: BackendBook): BookData => {
 export async function fetchBooks(
   params?: BookFilters,
   page = 1,
-  pageSize = 10,
+  pageSize = 50,
 ): Promise<BookListResult> {
   const safePage = Math.max(page, 1)
   const offset = (safePage - 1) * pageSize
