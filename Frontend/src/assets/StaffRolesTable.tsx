@@ -11,11 +11,13 @@ interface RoleAssignment {
   isRestricted: boolean
 }
 
-const ROLE_OPTIONS: RoleOption[] = ["staff", "admin"]
+const ASSIGN_OPTIONS: RoleOption[] = ["staff", "admin"]
+const SELECT_OPTIONS: RoleOption[] = ["patron", "staff", "admin"]
 
 const mapRole = (role?: string): RoleOption | null => {
   if (role === "staff") return "staff"
   if (role === "admin") return "admin"
+  if (role === "patron") return "patron"
   return null
 }
 
@@ -57,11 +59,11 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({
 
   useEffect(() => {
     setAssignments(defaultAssignments)
-  }, [defaultAssignments])
+  }, [])
 
   const sortedAssignments = useMemo(() => {
     return [...assignments]
-      .filter((assignment) => assignment.role !== "patron")
+      .filter((a) => a.role !== "patron")
       .sort((a, b) =>
         a.caseID.localeCompare(b.caseID, undefined, { sensitivity: "base" }),
       )
@@ -123,24 +125,28 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({
     let feedback = ""
     let targetCaseID = ""
     setAssignments((prev) => {
-      if (role === "patron") {
-        return prev.filter((entry) => {
+      return prev
+        .map((entry) => {
           if (entry.id === id) {
-            feedback = `${entry.caseID} now uses default patron access.`
+            feedback =
+              role === "patron"
+                ? `${entry.caseID} now uses default patron access.`
+                : `Updated ${entry.caseID} to ${role}.`
             targetCaseID = entry.caseID
-            return false
+            return { ...entry, role }
           }
-          return true
+          return entry
         })
-      }
+        .filter((entry) => entry.role !== "patron")
 
-      return prev.map((entry) => {
-        if (entry.id === id) {
-          feedback = `Updated ${entry.caseID} to ${role}.`
-          targetCaseID = entry.caseID
-          return { ...entry, role }
+    setHiddenCaseIDs((prev) => {
+        const next = new Set(prev)
+        if (role === "patron") {
+          next.add(targetCaseID.toLowerCase())
+        } else if (targetCaseID) {
+          next.delete(targetCaseID.toLowerCase())
         }
-        return entry
+        return next
       })
     })
 
@@ -181,7 +187,7 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({
             value={roleInput}
             onChange={(e) => setRoleInput(e.target.value as RoleOption)}
           >
-            {ROLE_OPTIONS.map((role) => (
+            {ASSIGN_OPTIONS.map((role) => (
               <option key={role} value={role}>
                 {role.charAt(0).toUpperCase() + role.slice(1)}
               </option>
@@ -216,7 +222,7 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({
                           updateRole(entry.id, e.target.value as RoleOption)
                         }
                       >
-                        {ROLE_OPTIONS.map((role) => (
+                        {SELECT_OPTIONS.map((role) => (
                           <option key={role} value={role}>
                             {role.charAt(0).toUpperCase() + role.slice(1)}
                           </option>
