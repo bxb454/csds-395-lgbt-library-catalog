@@ -16,7 +16,7 @@ import type { BookData, LoanRecord } from "./assets/Types.ts"
 import { sampleUsers } from "./assets/sampleUsers.tsx"
 import { fetchBooks, fetchBookBaseById, type BookFilters } from "./api/books"
 import { fetchLoans, deleteLoan, renewLoan } from "./api/loans"
-import { createUser, deleteUser, fetchUsers, updateUser } from "./api/users"
+import { createUser, fetchUsers, updateUser } from "./api/users"
 import { searchCatalog } from "./api/search"
 
 function App() {
@@ -234,44 +234,8 @@ function App() {
     runSearch()
   }, [loadLoans, runSearch])
 
-  const handleCreateUserRecord = useCallback(
-    async ({ caseID, role }: { caseID: string; role: string }) => {
-      try {
-        await createUser({ caseID, role, isRestricted: false })
-        await loadUsers()
-      } catch (err) {
-        console.error(err)
-        throw err
-      }
-    },
-    [loadUsers],
-  )
 
-  const handleUpdateUserRecord = useCallback(
-    async (caseID: string, updates: Partial<UserData>) => {
-      try {
-        await updateUser(caseID, updates)
-        await loadUsers()
-      } catch (err) {
-        console.error(err)
-        throw err
-      }
-    },
-    [loadUsers],
-  )
 
-  const handleDeleteUserRecord = useCallback(
-    async (caseID: string) => {
-      try {
-        await deleteUser(caseID)
-        await loadUsers()
-      } catch (err) {
-        console.error(err)
-        throw err
-      }
-    },
-    [loadUsers],
-  )
 
   const handleRestrictToggle = useCallback(
     async (caseID: string, value: boolean) => {
@@ -303,8 +267,21 @@ function App() {
 
   return (
     <>
-      <header className="app-header" style={{ padding: "24px 16px" }}>
-        <h1 className="app-title">LGBT Center Library Catalog</h1>
+      <header
+        className="app-header"
+        style={{ padding: "36px 20px", textAlign: "center" }}
+      >
+        <h1
+          className="app-title"
+          style={{
+            margin: 0,
+            fontSize: "36px",
+            letterSpacing: 0.5,
+            fontFamily: "'Times New Roman', Times, serif",
+          }}
+        >
+          LGBT Center Library Catalog
+        </h1>
       </header>
 
      {/* Temp debug login */}

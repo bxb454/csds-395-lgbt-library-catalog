@@ -1,16 +1,13 @@
-import React, { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useState } from "react"
 import axios from "axios"
 import type { BookData } from "./Types"
+import type { UserData } from "./Types"
 import {
-  addBookAuthor,
-  addBookTag,
-  deleteBookAuthor,
-  deleteBookTag,
   fetchBookAuthors,
   fetchBookTags,
 } from "../api/books"
-import { fetchAuthors, createAuthor, type Author } from "../api/authors"
 import { createLoan } from "../api/loans"
+import { fetchUsers } from "../api/users"
 
 interface BookDetailPopupProps {
   book: BookData
@@ -30,15 +27,27 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
   const [staffID, setStaffID] = useState("")
   const [authors, setAuthors] = useState<{ authID: number; name: string }[]>([])
   const [tags, setTags] = useState<string[]>(book.tags ?? [])
-  const [availableAuthors, setAvailableAuthors] = useState<Author[]>([])
-  const [selectedAuthorId, setSelectedAuthorId] = useState("")
-  const [newTag, setNewTag] = useState("")
-  const [newAuthorLName, setNewAuthorLName] = useState("")
-  const [newAuthorFName, setNewAuthorFName] = useState("")
   const [metaError, setMetaError] = useState<string | null>(null)
-  const [pendingMessage, setPendingMessage] = useState<string | null>(null)
   const [checkoutError, setCheckoutError] = useState<string | null>(null)
   const [checkoutLoading, setCheckoutLoading] = useState(false)
+  const [staffAccounts, setStaffAccounts] = useState<UserData[]>([])
+
+  const displayOrNA = (value?: string | number | null) => {
+    if (value === null || value === undefined) return "N/A"
+    const str = typeof value === "number" ? String(value) : String(value)
+    const trimmed = str.trim()
+    return trimmed.length > 0 ? trimmed : "N/A"
+  }
+
+  const displayDate = (value?: string | null) => {
+    if (!value) return "N/A"
+    const parsed = new Date(value)
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString().split("T")[0]
+    }
+    const trimmed = value.trim()
+    return trimmed.length > 0 ? trimmed : "N/A"
+  }
 
   useEffect(() => {
     let isMounted = true
@@ -46,10 +55,9 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
     const loadMeta = async () => {
       try {
         setMetaError(null)
-        const [authorResponse, tagResponse, allAuthors] = await Promise.all([
+        const [authorResponse, tagResponse] = await Promise.all([
           fetchBookAuthors(book.id),
           fetchBookTags(book.id),
-          fetchAuthors(),
         ])
         if (!isMounted) return
         setAuthors(
@@ -59,7 +67,6 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
           })),
         )
         setTags(tagResponse ?? [])
-        setAvailableAuthors(allAuthors ?? [])
       } catch (err) {
         console.error(err)
         if (isMounted) {
@@ -74,88 +81,22 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
     }
   }, [book.id])
 
-  const authorOptions = useMemo(
-    () =>
-      availableAuthors.filter(
-        (author) => !authors.some((a) => a.authID === author.authID),
-      ),
-    [availableAuthors, authors],
-  )
-
-  const handleAddTag = async () => {
-    const trimmed = newTag.trim()
-    if (!trimmed) return
-    try {
-      await addBookTag(book.id, trimmed)
-      setTags((prev) => [...prev, trimmed])
-      setNewTag("")
-    } catch (err) {
-      console.error(err)
-      setMetaError("Failed to add tag.")
-    }
-  }
-
-  const handleDeleteTag = async (tag: string) => {
-    try {
-      await deleteBookTag(book.id, tag)
-      setTags((prev) => prev.filter((existing) => existing !== tag))
-    } catch (err) {
-      console.error(err)
-      setMetaError("Failed to remove tag.")
-    }
-  }
-
-  const handleAddAuthor = async () => {
-    if (!selectedAuthorId) return
-    try {
-      await addBookAuthor(book.id, Number(selectedAuthorId))
-      const newlyAdded = authorOptions.find(
-        (author) => author.authID === Number(selectedAuthorId),
-      )
-      if (newlyAdded) {
-        setAuthors((prev) => [
-          ...prev,
-          {
-            authID: newlyAdded.authID,
-            name: [newlyAdded.fname, newlyAdded.lname]
-              .filter(Boolean)
-              .join(" ")
-              .trim(),
-          },
-        ])
+  useEffect(() => {
+    let isMounted = true
+    const loadStaff = async () => {
+      try {
+        const users = await fetchUsers()
+        if (!isMounted) return
+        setStaffAccounts(users.filter((u) => u.role === "staff" || u.role === "admin"))
+      } catch (err) {
+        console.error(err)
       }
-      setSelectedAuthorId("")
-    } catch (err) {
-      console.error(err)
-      setMetaError("Failed to add author.")
     }
-  }
-
-  const handleDeleteAuthor = async (authID: number) => {
-    try {
-      await deleteBookAuthor(book.id, authID)
-      setAuthors((prev) => prev.filter((author) => author.authID !== authID))
-    } catch (err) {
-      console.error(err)
-      setMetaError("Failed to remove author.")
+    void loadStaff()
+    return () => {
+      isMounted = false
     }
-  }
-
-  const handleCreateAuthor = async () => {
-    if (!newAuthorLName.trim()) return
-    try {
-      await createAuthor(newAuthorLName.trim(), newAuthorFName.trim() || undefined)
-      setPendingMessage("Author created. Refreshing list…")
-      setNewAuthorLName("")
-      setNewAuthorFName("")
-      const updatedAuthors = await fetchAuthors()
-      setAvailableAuthors(updatedAuthors)
-      setPendingMessage(null)
-    } catch (err) {
-      console.error(err)
-      setMetaError("Failed to create author.")
-    }
-  }
+  }, [])
 
   const canCheckout = isLoggedIn && book.available > 0
 
@@ -164,7 +105,15 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
   const handleCheckout = async () => {
     const patronCase = (patronCaseID ?? "").trim()
     if (!patronCase) {
-      setCheckoutError("Log in to a patron account before checking out.")
+      setCheckoutError("Log in to an account with a valid CASE ID before checking out.")
+      return
+    }
+    const staffCase = staffID.trim()
+    const staffEntry = staffAccounts.find(
+      (u) => u.caseID.toLowerCase() === staffCase.toLowerCase(),
+    )
+    if (!staffCase || !staffEntry || !["staff", "admin"].includes(staffEntry.role)) {
+      setCheckoutError("Checkout must be processed by a LGBT Center employee.")
       return
     }
     setCheckoutError(null)
@@ -232,19 +181,13 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
         }}
       >
         <div>
-          <div style={{ marginBottom: "15px" }}>
+          <div style={{ marginBottom: "15px", fontSize: "20px" }}>
             <strong>Title:</strong>
             <br />
             {book.title}
           </div>
 
-          <div style={{ marginBottom: "15px" }}>
-            <strong>ISBN:</strong>
-            <br />
-            {book.isbn || "[ISBN]"}
-          </div>
-
-          <div style={{ marginBottom: "15px" }}>
+          <div style={{ marginBottom: "15px", fontSize: "20px" }}>
             <strong>Author(s):</strong>
             <br />
             {authors.length > 0
@@ -256,17 +199,83 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
                     <span>{author.name}</span>
                   </div>
                 ))
-              : book.author || ""}
+              : "N/A"}
           </div>
 
-          <div style={{ marginBottom: "15px" }}>
-            <strong>Publishing info:</strong>
-            <br />
-            {book.publisher || "[Publisher]"}
-            <br />
-            {book.edition || "[Edition]"}
-            <br />
-            {book.pubYear || "[PubYear]"}
+          <div style={{ marginBottom: "15px", fontSize: "20px" }}>
+            <strong>Details:</strong>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "160px 1fr",
+                rowGap: 10,
+                columnGap: 12,
+                marginTop: 8,
+                alignItems: "center",
+              }}
+            >
+              <span
+                style={{
+                  fontWeight: 600,
+                  color: "#444",
+                  fontSize: "16px",
+                  textAlign: "right",
+                }}
+              >
+                Publisher
+              </span>
+              <span>{displayOrNA(book.publisher)}</span>
+
+              <span
+                style={{
+                  fontWeight: 600,
+                  color: "#444",
+                  fontSize: "16px",
+                  textAlign: "right",
+                }}
+              >
+                Edition
+              </span>
+              <span>{displayOrNA(book.edition)}</span>
+
+              <span
+                style={{
+                  fontWeight: 600,
+                  color: "#444",
+                  fontSize: "16px",
+                  textAlign: "right",
+                }}
+              >
+                Publication date
+              </span>
+              <span>{displayDate(book.pubdate)}</span>
+
+              <span
+                style={{
+                  fontWeight: 600,
+                  color: "#444",
+                  fontSize: "16px",
+                  textAlign: "right",
+                }}
+              >
+                ISBN
+              </span>
+              <span>{displayOrNA(book.isbn)}</span>
+
+              <span
+                style={{
+                  fontWeight: 600,
+                  color: "#444",
+                  fontSize: "16px",
+                  textAlign: "right",
+                }}
+              >
+                Copies
+              </span>
+              <span>
+                {book.available}/{book.copies} available
+              </span>
+            </div>
           </div>
         </div>
 
@@ -286,11 +295,8 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
             Thumbnail
           </div>
 
-          <div style={{ marginBottom: "10px" }}>
-            [{book.available}/{book.copies}] available
-          </div>
-
           <div>
+            <div style={{ fontWeight: 600, marginBottom: 4, fontSize: 20 }}>Tags:</div>
             {tags.length > 0 ? (
               <ul style={{ paddingLeft: 20 }}>
                 {tags.map((tag) => (
@@ -300,7 +306,7 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
                 ))}
               </ul>
             ) : (
-              "No tags yet"
+              <span>N/A</span>
             )}
           </div>
           {metaError && (
@@ -322,7 +328,7 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
             <strong>Check out item?</strong>
 
             <div style={{ marginTop: "6px" }}>
-              Processed by:{" "}
+              Staff member on desk:{" "}
               <input
                 value={staffID}
                 onChange={(e) => setStaffID(e.target.value)}
@@ -373,8 +379,8 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
                 fontSize: "16px",
                 padding: "10px 18px",
                 borderRadius: "8px",
-                border: "1px solid #1976d2",
-                background: checkoutLoading ? "#e0e0e0" : "#1976d2",
+                border: "2px solid #003071",
+                background: checkoutLoading ? "#e0e0e0" : "#003071",
                 color: checkoutLoading ? "#666" : "white",
                 cursor: checkoutLoading ? "not-allowed" : "pointer",
                 minWidth: "120px",

@@ -4,7 +4,7 @@ import {
     useMaterialReactTable,
 } from "material-react-table"
 
-import { useMemo } from "react"
+import { useCallback, useMemo } from "react"
 import type { LoanRecord, UserData, BookData } from "./Types"
 
 interface Props {
@@ -27,15 +27,21 @@ const AllLoansTable: React.FC<Props> = ({
     onRestrictToggle,
 }) => {
     /** Lookup helpers */
-    const getUser = (caseID: string | null): UserData =>
-        users.find((u) => u.caseID === caseID) ?? {
-            caseID: caseID ?? "Unknown",
-            role: "patron",
-            isRestricted: false,
-        }
+    const getUser = useCallback(
+        (caseID: string | null): UserData =>
+            users.find((u) => u.caseID === caseID) ?? {
+                caseID: caseID ?? "Unknown",
+                role: "patron",
+                isRestricted: false,
+            },
+        [users],
+    )
 
-    const getBook = (bookId: number) =>
-        books.find((b) => b.id === bookId) ?? ({} as BookData)
+    const getBook = useCallback(
+        (bookId: number) =>
+            books.find((b) => b.id === bookId) ?? ({} as BookData),
+        [books],
+    )
 
     const formatDate = (value: string) => {
         const parsed = new Date(value);
@@ -115,7 +121,7 @@ const AllLoansTable: React.FC<Props> = ({
                         {/* Renewal */}
                         <span
                             style={{
-                                color: "blue",
+                                color: "#003071",
                                 cursor: "pointer",
                                 textDecoration: "underline",
                             }}
@@ -127,7 +133,7 @@ const AllLoansTable: React.FC<Props> = ({
                         {/* Return */}
                         <span
                             style={{
-                                color: "blue",
+                                color: "#003071",
                                 cursor: "pointer",
                                 textDecoration: "underline",
                             }}
@@ -152,7 +158,7 @@ const AllLoansTable: React.FC<Props> = ({
                 );
             },
         },
-    ], [books, users]);
+    ], [getBook, getUser, onRenew, onReturn, onRestrictToggle]);
 
     /** INIT TABLE */
     const table = useMaterialReactTable({
@@ -171,7 +177,7 @@ const AllLoansTable: React.FC<Props> = ({
             sx: {
                 borderRight: "1px solid #999",
                 borderBottom: "1px solid #999",
-                py: 0.8,
+                py: 2,
                 px: 1,
                 "&:last-of-type": { borderRight: "none" },
                 "& img": { display: "block", margin: "0 auto" },
@@ -181,7 +187,7 @@ const AllLoansTable: React.FC<Props> = ({
             sx: {
                 borderRight: "1px solid #999",
                 borderBottom: "1px solid #999",
-                py: 0.8,
+                py: 2,
                 px: 1,
                 "&:last-of-type": { borderRight: "none" },
                 fontWeight: 700,
@@ -197,7 +203,7 @@ const AllLoansTable: React.FC<Props> = ({
 
     return (
         <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
-            <div style={{ width: "950px", border: "1px solid #999" }}>
+            <div style={{ width: "1100px", border: "2px solid #999" }}>
                 <MaterialReactTable table={table} />
             </div>
         </div>

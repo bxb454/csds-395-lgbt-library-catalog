@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react"
 import { Box, Button, Menu, MenuItem, TextField } from "@mui/material"
+import SearchIcon from "@mui/icons-material/Search"
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown"
 import LoginButton from "./LoginButton"
 import NavigationMenu from "./NavigationMenu"
@@ -43,6 +44,7 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   const role = currentUser?.role ?? "patron";
+  const isCatalog = currentPage === "catalog";
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -55,7 +57,7 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
   }, []);
 
   const placeholderMap: Record<SearchOption, string> = {
-    general: "Search by title, author, or keyword…",
+    general: "Search by title or keyword…",
     title: "Search by title…",
     author: "Search by author…",
     keyword: "Search by keyword or tag…",
@@ -78,10 +80,10 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
       sx={{
         width: "100vw",
         ml: "calc(50% - 50vw)",
-        backgroundColor: "white",
+        backgroundColor: "#b5c0d6",
         borderTop: "1px solid #999",
         borderBottom: "1px solid #999",
-        padding: "1rem 0",
+        padding: "1.5rem 0",
         boxSizing: "border-box",
         position: "relative",
         zIndex: 20,
@@ -99,17 +101,28 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
       >
 
         <Box
-          sx={{
-            border: "1px solid #777",
-            display: "flex",
-            alignItems: "center",
-            width: "80%",
-            height: "36px",
-            paddingLeft: "10px",
-            boxSizing: "border-box",
-          }}
+          sx={
+            isCatalog
+              ? {
+                  border: "1px solid #777",
+                  display: "flex",
+                  alignItems: "center",
+                  width: "80%",
+                  height: "44px",
+                  boxSizing: "border-box",
+                  backgroundColor: "white",
+                }
+              : {
+                  width: "80%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minHeight: "44px",
+                  paddingLeft: 0,
+                }
+          }
         >
-          {currentPage === "catalog" ? (
+          {isCatalog ? (
             <>
               <Button
                 onClick={(e) => setAnchorEl(e.currentTarget)}
@@ -117,14 +130,16 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
                   borderRight: "1px solid #777",
                   borderRadius: 0,
                   height: "100%",
-                  width: "150px",
-                  fontSize: "16px",
+                  width: "190px",
+                  fontSize: "18px",
+                  fontWeight: 700,
                   color: "#444",
                   textTransform: "none",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  px: 1,
+                  px: 1.5,
+                  backgroundColor: "#eef3fa",
                 }}
               >
                 Search by
@@ -175,10 +190,30 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
                   "& .MuiInputBase-root:after": { borderBottom: "none !important" },
                 }}
               />
+
+              <Button
+                aria-label="Search"
+                onClick={() => onSearchTextChange(searchText)}
+                sx={{
+                  minWidth: 48,
+                  height: "100%",
+                  color: "#444",
+                }}
+              >
+                <SearchIcon />
+              </Button>
             </>
           ) : (
             // Search bar replacement title
-            <span style={{ fontSize: "18px", fontWeight: 500 }}>
+            <span
+              style={{
+                fontSize: "28px",
+                fontWeight: 700,
+                color: "#0c2f6e",
+                textAlign: "left",
+                transform: "translateX(-200px)",
+              }}
+            >
               {currentPage === "myloans" && "My Loans"}
               {currentPage === "allloans" && "All Loans"}
               {currentPage === "updatecatalog" && "Add to Catalog"}
@@ -194,11 +229,11 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
             transform: "translateY(-50%)",
             display: "flex",
             alignItems: "center",
-            gap: 1,
+            gap: 2,
           }}
         >
 
-          <Box sx={{ width: 36, display: "flex", justifyContent: "center" }}>
+          <Box sx={{ width: 44, display: "flex", justifyContent: "center" }}>
             {isLoggedIn && (
               <NavigationMenu onClick={() => setNavOpen(!navOpen)} />
             )}
@@ -235,7 +270,7 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
                   style={{
                     fontSize: "22px",
                     cursor: "pointer",
-                    color: currentPage === item.page ? "blue" : "black",
+                    color: currentPage === item.page ? "#0c51b8" : "#2a4468",
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
                   onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}

@@ -40,8 +40,9 @@ export function filterBooks(
 
   return books.filter((book) => {
     const title = (book.title || "").toLowerCase()
-    const authorName = authorsByBook?.[book.id] ?? book.author ?? ""
-    const author = authorName.toLowerCase()
+    const authorName = authorsByBook?.[book.id] ?? ""
+    const fallbackAuthor = book.author ?? ""
+    const author = `${authorName} ${fallbackAuthor}`.toLowerCase().trim()
     const genre = (book.genre || "").toLowerCase()
     const tagList = tagsByBook?.[book.id] ?? book.tags ?? []
     const tags = tagList.join(" ").toLowerCase()
@@ -68,7 +69,6 @@ export function filterBooks(
       default:
         return (
           title.includes(q) ||
-          author.includes(q) ||
           genre.includes(q) ||
           tags.includes(q)
         )

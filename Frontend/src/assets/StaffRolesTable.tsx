@@ -59,7 +59,7 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({
 
   useEffect(() => {
     setAssignments(defaultAssignments)
-  }, [])
+  }, [defaultAssignments])
 
   const sortedAssignments = useMemo(() => {
     return [...assignments]
@@ -105,6 +105,7 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({
         id: nextId,
         caseID: trimmedCase,
         role: roleInput,
+        isRestricted: false,
       }
       feedback = `Assigned ${trimmedCase} the ${roleInput} role.`
       return [...prevAssignments, created]
@@ -124,7 +125,7 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({
   const updateRole = async (id: number, role: RoleOption) => {
     let feedback = ""
     let targetCaseID = ""
-    setAssignments((prev) => {
+    setAssignments((prev: RoleAssignment[]) => {
       return prev
         .map((entry) => {
           if (entry.id === id) {
@@ -138,16 +139,6 @@ const StaffRolesTable: FC<StaffRolesTableProps> = ({
           return entry
         })
         .filter((entry) => entry.role !== "patron")
-
-    setHiddenCaseIDs((prev) => {
-        const next = new Set(prev)
-        if (role === "patron") {
-          next.add(targetCaseID.toLowerCase())
-        } else if (targetCaseID) {
-          next.delete(targetCaseID.toLowerCase())
-        }
-        return next
-      })
     })
 
     if (!targetCaseID) {

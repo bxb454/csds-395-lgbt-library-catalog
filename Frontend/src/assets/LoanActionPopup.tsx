@@ -1,4 +1,6 @@
-import React from "react"
+import React, { useEffect, useState } from "react"
+import { fetchUsers } from "../api/users"
+import type { UserData } from "./Types"
 
 interface LoanActionPopupProps {
   mode: "renew" | "return"
@@ -15,6 +17,41 @@ const LoanActionPopup: React.FC<LoanActionPopupProps> = ({
   onClose,
   onSubmit,
 }) => {
+  const displayTitle = title.trim()
+  const [staffCaseId, setStaffCaseId] = useState("")
+  const [staffAccounts, setStaffAccounts] = useState<UserData[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    const loadStaff = async () => {
+      try {
+        const users = await fetchUsers()
+        if (!mounted) return
+        setStaffAccounts(users.filter((u) => u.role === "staff" || u.role === "admin"))
+      } catch (err) {
+        console.error(err)
+      }
+    }
+    void loadStaff()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const handleSubmit = () => {
+    const trimmed = staffCaseId.trim()
+    const staffEntry = staffAccounts.find(
+      (u) => u.caseID.toLowerCase() === trimmed.toLowerCase(),
+    )
+    if (!trimmed || !staffEntry) {
+      setError("Enter a valid staff/admin CASE ID.")
+      return
+    }
+    setError(null)
+    onSubmit()
+  }
+
   return (
     <div
       style={{
@@ -23,7 +60,7 @@ const LoanActionPopup: React.FC<LoanActionPopupProps> = ({
         left: 0,
         width: "100vw",
         height: "100vh",
-        backgroundColor: "black",
+        backgroundColor: "rgba(0, 0, 0, 0.3)",
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
@@ -39,10 +76,10 @@ const LoanActionPopup: React.FC<LoanActionPopupProps> = ({
           textAlign: "center",
           boxShadow: "0px 4px 8px rgba(0,0,0,0.2)",
         }}
-      >
-        <h2 style={{ marginTop: 0, marginBottom: "20px" }}>
-          {mode === "renew" ? "Renewal for" : "Return for"} {title}
-        </h2>
+        >
+          <h2 style={{ marginTop: 0, marginBottom: "20px" }}>
+          {mode === "renew" ? "Renewal for" : "Return for"} '{displayTitle}'
+          </h2>
 
         {mode === "renew" ? (
           <p style={{ fontSize: "18px", marginBottom: "25px" }}>
@@ -65,7 +102,8 @@ const LoanActionPopup: React.FC<LoanActionPopupProps> = ({
           Staff member on desk:{" "}
           <input
             type="text"
-            defaultValue="abc123"
+            value={staffCaseId}
+            onChange={(e) => setStaffCaseId(e.target.value)}
             style={{
               display: "inline-block",
               marginLeft: "8px",
@@ -74,38 +112,50 @@ const LoanActionPopup: React.FC<LoanActionPopupProps> = ({
               width: "150px",
             }}
           />
+          {error && (
+            <div style={{ color: "#c62828", marginTop: 8, fontSize: 14 }}>{error}</div>
+          )}
         </div>
 
         <div
           style={{
             marginTop: "30px",
             display: "flex",
-            justifyContent: "space-evenly",
+            justifyContent: "center",
+            gap: 24,
           }}
         >
-          <span
+          <button
             onClick={onClose}
             style={{
-              color: "red",
-              fontSize: "22px",
+              padding: "10px 18px",
+              fontSize: "16px",
+              borderRadius: 6,
+              border: "2px solid #c62828",
+              background: "white",
+              color: "#c62828",
               cursor: "pointer",
-              textDecoration: "underline",
+              minWidth: 120,
             }}
           >
             Cancel
-          </span>
+          </button>
 
-          <span
-            onClick={onSubmit}
+          <button
+            onClick={handleSubmit}
             style={{
-              color: "blue",
-              fontSize: "22px",
+              padding: "10px 18px",
+              fontSize: "16px",
+              borderRadius: 6,
+              border: "2px solid #003071",
+              background: "#003071",
+              color: "white",
               cursor: "pointer",
-              textDecoration: "underline",
+              minWidth: 120,
             }}
           >
             Submit
-          </span>
+          </button>
         </div>
       </div>
     </div>

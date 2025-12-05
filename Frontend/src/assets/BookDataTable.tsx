@@ -298,26 +298,10 @@ const BookDataTable = ({
         }
     }
 
-    const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0]
-        if (!file) return
-
-        if (!file.type.startsWith("image/")) {
-            alert("Please choose an image file.")
-            return
-        }
-
-        const reader = new FileReader()
-        reader.onload = () => {
-            const result = reader.result
-            if (typeof result === "string") {
-                updateEditField("image", result)
-            }
-        }
-        reader.readAsDataURL(file)
-    }
-
-    const handleDeleteRow = (row: any, event?: MouseEvent) => {
+    const handleDeleteRow = (
+        row: { original: BookData },
+        event?: MouseEvent,
+    ) => {
         event?.stopPropagation()
         setPendingDelete(row.original)
     }
@@ -410,8 +394,10 @@ const BookDataTable = ({
             }
         }
 
-        const current = await fetchBookAuthors(bookId).catch(() => [] as any[])
-        const currentIds = current.map((a: any) => a.authID)
+        const current = await fetchBookAuthors(bookId).catch(
+            () => [] as { authID: number }[],
+        )
+        const currentIds = current.map((a) => a.authID)
 
         for (const id of currentIds) {
             if (!desiredIds.includes(id)) {
@@ -543,7 +529,7 @@ const BookDataTable = ({
         }),
         muiTableBodyCellProps: {
             sx: {
-                py: 0.5,
+                py: 1.6,
                 px: 1,
                 borderRight: "1px solid #999",
                 borderBottom: "1px solid #999",
@@ -552,7 +538,7 @@ const BookDataTable = ({
         },
         muiTableHeadCellProps: {
             sx: {
-                py: 0.5,
+                py: 1.6,
                 px: 1,
                 borderRight: "1px solid #999",
                 borderBottom: "1px solid #999",
@@ -569,8 +555,23 @@ const BookDataTable = ({
 
     if (loading || metaLoading) {
         return (
-            <Box sx={{ width: "100%", display: "flex", justifyContent: "center", mt: 4 }}>
-                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
+            <Box
+                sx={{
+                    width: "100%",
+                    minHeight: "60vh",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center",
+                }}
+            >
+                <Box
+                    sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 1,
+                    }}
+                >
                     <CircularProgress size={36} />
                     <div style={{ color: "#555", fontSize: 14 }}>Loading catalog…</div>
                 </Box>
@@ -583,8 +584,8 @@ const BookDataTable = ({
             <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
                 <Box
                     sx={{
-                        width: "700px",
-                        border: "1px solid #999",
+                        width: "900px",
+                        border: "2px solid #999",
                     }}
                 >
                     <MaterialReactTable table={table} />

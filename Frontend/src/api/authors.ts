@@ -7,22 +7,19 @@ export interface Author {
   fname?: string | null
 }
 
-type BackendAuthor =
-  | {
-      authID: number
-      lname: string
-      fname?: string | null
-    }
-  | {
-      AuthID: number
-      LName: string
-      FName?: string | null
-    }
+type BackendAuthor = {
+  authID?: number
+  AuthID?: number
+  lname?: string
+  LName?: string
+  fname?: string | null
+  FName?: string | null
+}
 
 const adaptAuthor = (author: BackendAuthor): Author => ({
-  authID: "AuthID" in author ? author.AuthID : author.authID,
-  lname: "LName" in author ? author.LName : author.lname,
-  fname: "FName" in author ? author.FName : author.fname,
+  authID: author.authID ?? author.AuthID ?? -1,
+  lname: author.lname ?? author.LName ?? "",
+  fname: author.fname ?? author.FName ?? undefined,
 })
 
 export async function fetchAuthors(): Promise<Author[]> {

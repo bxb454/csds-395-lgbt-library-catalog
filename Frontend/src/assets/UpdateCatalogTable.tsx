@@ -22,21 +22,11 @@ const numberOrDefault = (value: unknown, fallback: number) => {
 const normalizeDate = (value: unknown) => {
   const dateStr = String(value ?? "").trim()
   if (!dateStr) return undefined
-  //forcing YYYY-MM-DD
+  // forcing YYYY-MM-DD
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     throw new Error("Publication date must be in YYYY-MM-DD format.")
   }
   return dateStr
-}
-
-const parseAuthorName = (raw: string): { fname?: string; lname: string } => {
-  const parts = raw.split(/\s+/).filter(Boolean)
-  if (parts.length <= 1) {
-    return { lname: parts[0] ?? raw }
-  }
-  const lname = parts.pop() ?? ""
-  const fname = parts.join(" ")
-  return { fname: fname || undefined, lname }
 }
 
 const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
@@ -44,11 +34,16 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
 }) => {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<{
+    title?: boolean
+    copies?: boolean
+    authors?: boolean
+  }>({})
   const [authors, setAuthors] = useState<Author[]>([])
   const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
   const [newBook, setNewBook] = useState({
     title: "",
-    author: "",
+    authors: [{ fname: "", lname: "" }],
     genre: "",
     copies: "",
     publisher: "",
@@ -68,9 +63,17 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
 
   const handleCreate = async () => {
     setError(null)
+    setFieldErrors({})
+    const title = newBook.title.trim()
+    if (!title) {
+      setError("Title is required.")
+      setFieldErrors({ title: true })
+      return
+    }
     const copies = numberOrDefault(newBook.copies, 0)
     if (copies <= 0) {
       setError("Copies must be greater than 0.")
+      setFieldErrors({ copies: true })
       return
     }
 
@@ -83,7 +86,7 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
     }
 
     const payload: BookWritePayload = {
-      title: newBook.title || "Untitled",
+      title,
       copies,
       isbn: newBook.isbn ? String(newBook.isbn) : undefined,
       publisher: newBook.publisher,
@@ -91,12 +94,19 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
       pubdate: normalizedPubdate,
     }
 
-    const authorNames = newBook.author
-      ? newBook.author
-          .split(",")
-          .map((name) => name.trim())
-          .filter((name) => name.length > 0)
-      : []
+    const authorEntries = newBook.authors
+      .map((a) => ({
+        fname: a.fname.trim(),
+        lname: a.lname.trim(),
+      }))
+      .filter((a) => a.fname || a.lname)
+
+    if (authorEntries.some((a) => !a.lname)) {
+      setError("Each author needs a last name.")
+      setFieldErrors((prev) => ({ ...prev, authors: true }))
+      return
+    }
+
     const tagInput = newBook.tags
       ? newBook.tags
           .split(",")
@@ -114,7 +124,12 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
       const matchedAuthors: Author[] = []
       const unmatchedAuthors: string[] = []
 
-      for (const name of authorNames) {
+      for (const entry of authorEntries) {
+        const targetName = [entry.fname, entry.lname]
+          .filter(Boolean)
+          .join(" ")
+          .trim()
+          .toLowerCase()
         const findMatch = (list: Author[]) =>
           list.find((author) => {
             const fullName = [author.fname, author.lname]
@@ -122,14 +137,13 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
               .join(" ")
               .trim()
               .toLowerCase()
-            return fullName === name.toLowerCase()
+            return fullName === targetName
           })
 
         let match = findMatch(latestAuthors)
         if (!match) {
           try {
-            const parsed = parseAuthorName(name)
-            await createAuthor(parsed.lname, parsed.fname)
+            await createAuthor(entry.lname, entry.fname)
             const refreshed = await fetchAuthors()
             latestAuthors = refreshed
             setAuthors(refreshed)
@@ -149,7 +163,10 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
         if (match) {
           matchedAuthors.push(match)
         } else {
-          unmatchedAuthors.push(name)
+          unmatchedAuthors.push(
+            [entry.fname, entry.lname].filter(Boolean).join(" ").trim() ||
+              "Unknown author",
+          )
         }
       }
 
@@ -186,7 +203,7 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
       setError(null)
       setNewBook({
         title: "",
-        author: "",
+        authors: [{ fname: "", lname: "" }],
         genre: "",
         copies: "",
         publisher: "",
@@ -209,84 +226,292 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
 
   return (
     <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
-      <Box sx={{ width: "900px", border: "1px solid #999", p: 2 }}>
+      <Box sx={{ width: "900px", border: "2px solid #999", p: 2 }}>
         <h3 style={{ marginTop: 0 }}>Add a New Book</h3>
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "12px",
-            marginBottom: "16px",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: "16px 20px",
+            marginBottom: "20px",
           }}
         >
-          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
-            Title
+          {/* Title – full width */}
+          <label
+            style={{
+              gridColumn: "1 / -1",
+              display: "flex",
+              flexDirection: "column",
+              fontSize: 12,
+              gap: 4,
+            }}
+          >
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+              Title
+              <span style={{ color: "red" }}>*</span>
+            </span>
             <input
+              style={{
+                padding: "6px 8px",
+                border: "2px solid #ccc",
+                borderColor: fieldErrors.title ? "red" : "#ccc",
+              }}
               value={newBook.title}
-              onChange={(e) => setNewBook({ ...newBook, title: e.target.value })}
+              onChange={(e) =>
+                setNewBook({ ...newBook, title: e.target.value })
+              }
+              required
             />
           </label>
-          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
-            Author(s) (comma separated)
-            <input
-              value={newBook.author}
-              onChange={(e) => setNewBook({ ...newBook, author: e.target.value })}
-            />
-          </label>
-          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+
+          {/* Authors – full width row, inner grid matches 3 columns */}
+          <div
+            style={{
+              gridColumn: "1 / -1",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div style={{ fontSize: 12, fontWeight: 600 }}>Author(s)</div>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() =>
+                  setNewBook({
+                    ...newBook,
+                    authors: [...newBook.authors, { fname: "", lname: "" }],
+                  })
+                }
+                sx={{
+                  whiteSpace: "nowrap",
+                  minWidth: 32,
+                  maxWidth: 32,
+                  height: 32,
+                  px: 0,
+                  lineHeight: 1.1,
+                  fontSize: 12,
+                  borderRadius: "50%",
+                }}
+              >
+                +
+              </Button>
+            </div>
+            {newBook.authors.map((author, idx) => (
+              <div
+                key={idx}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr 48px",
+                  gap: "16px 20px",
+                  alignItems: "center",
+                  width: "calc((100% - 40px) / 2.9)",
+                }}
+              >
+                <input
+                  style={{ width: "100%", padding: "6px 8px", border: "2px solid #ccc" }}
+                  placeholder="First name"
+                  value={author.fname}
+                  onChange={(e) => {
+                    const next = [...newBook.authors]
+                    next[idx] = { ...next[idx], fname: e.target.value }
+                    setNewBook({ ...newBook, authors: next })
+                  }}
+                />
+                <input
+                  style={{
+                    width: "100%",
+                    padding: "6px 8px",
+                    border: "2px solid #ccc",
+                    borderColor:
+                      fieldErrors.authors && !author.lname.trim()
+                        ? "red"
+                        : "#ccc",
+                  }}
+                  placeholder="Last name"
+                  value={author.lname}
+                  onChange={(e) => {
+                    const next = [...newBook.authors]
+                    next[idx] = { ...next[idx], lname: e.target.value }
+                    setNewBook({ ...newBook, authors: next })
+                  }}
+                />
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    color="error"
+                    disabled={newBook.authors.length <= 1}
+                    onClick={() => {
+                      if (newBook.authors.length <= 1) return
+                      const next = [...newBook.authors]
+                      next.splice(idx, 1)
+ 	     			 setNewBook({ ...newBook, authors: next })
+                    }}
+                    sx={{
+                      whiteSpace: "nowrap",
+                      minWidth: 36,
+                      maxWidth: 36,
+                      height: 32,
+                      px: 0,
+                      lineHeight: 1.1,
+                      fontSize: 12,
+                      borderRadius: 0,
+                    }}
+                  >
+                    –
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              fontSize: 12,
+              gap: 4,
+            }}
+          >
             Genre
             <input
+              style={{ padding: "6px 8px", border: "2px solid #ccc" }}
               value={newBook.genre}
-              onChange={(e) => setNewBook({ ...newBook, genre: e.target.value })}
+              onChange={(e) =>
+                setNewBook({ ...newBook, genre: e.target.value })
+              }
             />
           </label>
-          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
-            Copies
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              fontSize: 12,
+              gap: 4,
+            }}
+          >
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+              Copies
+              <span style={{ color: "red" }}>*</span>
+            </span>
             <input
+              style={{
+                padding: "6px 8px",
+                border: "2px solid #ccc",
+                borderColor: fieldErrors.copies ? "red" : "#ccc",
+              }}
               type="number"
               min={0}
               value={newBook.copies}
-              onChange={(e) => setNewBook({ ...newBook, copies: e.target.value })}
+              onChange={(e) =>
+                setNewBook({ ...newBook, copies: e.target.value })
+              }
             />
           </label>
-          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              fontSize: 12,
+              gap: 4,
+            }}
+          >
             Publisher
             <input
+              style={{ padding: "6px 8px", border: "2px solid #ccc" }}
               value={newBook.publisher}
-              onChange={(e) => setNewBook({ ...newBook, publisher: e.target.value })}
+              onChange={(e) =>
+                setNewBook({ ...newBook, publisher: e.target.value })
+              }
             />
           </label>
-          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              fontSize: 12,
+              gap: 4,
+            }}
+          >
             Edition
             <input
+              style={{ padding: "6px 8px", border: "2px solid #ccc" }}
               value={newBook.edition}
-              onChange={(e) => setNewBook({ ...newBook, edition: e.target.value })}
+              onChange={(e) =>
+                setNewBook({ ...newBook, edition: e.target.value })
+              }
             />
           </label>
-          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              fontSize: 12,
+              gap: 4,
+            }}
+          >
             Publication Date
             <input
+              style={{ padding: "6px 8px", border: "2px solid #ccc" }}
               placeholder="YYYY-MM-DD"
               value={newBook.pubdate}
-              onChange={(e) => setNewBook({ ...newBook, pubdate: e.target.value })}
+              onChange={(e) =>
+                setNewBook({ ...newBook, pubdate: e.target.value })
+              }
             />
           </label>
-          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              fontSize: 12,
+              gap: 4,
+            }}
+          >
             ISBN
             <input
+              style={{ padding: "6px 8px", border: "2px solid #ccc" }}
               value={newBook.isbn}
-              onChange={(e) => setNewBook({ ...newBook, isbn: e.target.value })}
+              onChange={(e) =>
+                setNewBook({ ...newBook, isbn: e.target.value })
+              }
             />
           </label>
-          <label style={{ display: "flex", flexDirection: "column", fontSize: 12 }}>
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              fontSize: 12,
+              gap: 4,
+            }}
+          >
             Tags (comma separated)
             <input
+              style={{ padding: "6px 8px", border: "2px solid #ccc" }}
               value={newBook.tags}
-              onChange={(e) => setNewBook({ ...newBook, tags: e.target.value })}
+              onChange={(e) =>
+                setNewBook({ ...newBook, tags: e.target.value })
+              }
             />
           </label>
         </div>
-        <Button variant="contained" onClick={handleCreate} disabled={isSaving}>
+        <Button
+          className="staff-roles-submit"
+          variant="contained"
+          onClick={handleCreate}
+          disabled={isSaving}
+          sx={{
+            textTransform: "none",
+            fontWeight: 600,
+            padding: "10px 18px",
+            borderRadius: "6px",
+            backgroundColor: "#003071",
+            color: "#fff",
+            "&:hover": { backgroundColor: "#0046a6" },
+          }}
+        >
           {isSaving ? "Saving..." : "Add Book"}
         </Button>
         {error && (

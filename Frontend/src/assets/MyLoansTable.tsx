@@ -4,7 +4,7 @@ import {
     useMaterialReactTable,
 } from "material-react-table"
 
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import type { BookData, LoanRecord } from "./Types"
 
 interface Props {
@@ -15,8 +15,11 @@ interface Props {
 }
 
 const MyLoansTable: React.FC<Props> = ({ loans, books, onRenew, onReturn }) => {
-    const getBook = (bookId: number) =>
-        books.find((b) => b.id === bookId) ?? ({} as BookData);
+    const getBook = useCallback(
+        (bookId: number) =>
+            books.find((b) => b.id === bookId) ?? ({} as BookData),
+        [books],
+    );
 
     const formatDate = (value: string) => {
         const parsed = new Date(value);
@@ -34,10 +37,18 @@ const MyLoansTable: React.FC<Props> = ({ loans, books, onRenew, onReturn }) => {
             Cell: ({ cell }) => {
                 const book = getBook(cell.getValue<number>())
                 return book?.image ? (
-                    <img
-                        src={book.image}
-                        style={{ width: 50, height: 50, borderRadius: 6 }}
-                    />
+                    <div
+                        style={{
+                            width: "100%",
+                            display: "flex",
+                            justifyContent: "center",
+                        }}
+                    >
+                        <img
+                            src={book.image}
+                            style={{ width: 50, height: 50, borderRadius: 6 }}
+                        />
+                    </div>
                 ) : (
                     <div
                         style={{
@@ -45,6 +56,7 @@ const MyLoansTable: React.FC<Props> = ({ loans, books, onRenew, onReturn }) => {
                             height: 50,
                             borderRadius: 6,
                             backgroundColor: "#f1f1f1",
+                            margin: "0 auto",
                         }}
                     />
                 )
@@ -89,7 +101,7 @@ const MyLoansTable: React.FC<Props> = ({ loans, books, onRenew, onReturn }) => {
                     <div style={{ display: "flex", flexDirection: "column" }}>
                         <span
                             style={{
-                                color: "blue",
+                                color: "#003071",
                                 cursor: "pointer",
                                 textDecoration: "underline",
                                 marginBottom: 4,
@@ -101,7 +113,7 @@ const MyLoansTable: React.FC<Props> = ({ loans, books, onRenew, onReturn }) => {
 
                         <span
                             style={{
-                                color: "blue",
+                                color: "#003071",
                                 cursor: "pointer",
                                 textDecoration: "underline",
                             }}
@@ -113,7 +125,7 @@ const MyLoansTable: React.FC<Props> = ({ loans, books, onRenew, onReturn }) => {
                 )
             },
         },
-    ], [books])
+    ], [getBook, onRenew, onReturn])
 
     const table = useMaterialReactTable({
         columns,
@@ -131,7 +143,7 @@ const MyLoansTable: React.FC<Props> = ({ loans, books, onRenew, onReturn }) => {
             sx: {
                 borderRight: "1px solid #999",
                 borderBottom: "1px solid #999",
-                py: 0.5,
+                py: 2,
                 px: 1,
                 "&:last-of-type": { borderRight: "none" },
             },
@@ -140,7 +152,7 @@ const MyLoansTable: React.FC<Props> = ({ loans, books, onRenew, onReturn }) => {
             sx: {
                 borderRight: "1px solid #999",
                 borderBottom: "1px solid #999",
-                py: 0.5,
+                py: 2,
                 px: 1,
                 "&:last-of-type": { borderRight: "none" },
             },
@@ -154,7 +166,7 @@ const MyLoansTable: React.FC<Props> = ({ loans, books, onRenew, onReturn }) => {
 
     return (
         <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
-            <div style={{ width: "700px", border: "1px solid #999" }}>
+            <div style={{ width: "1100px", border: "2px solid #999" }}>
                 <MaterialReactTable table={table} />
             </div>
         </div>

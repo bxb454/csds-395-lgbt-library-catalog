@@ -22,6 +22,12 @@ const LoginButton: React.FC<LoginButtonProps> = ({
     <button
       onClick={isLoggedIn ? onLogout : handleLogin}
       className="login-button"
+      style={{
+        padding: "10px 18px",
+        fontSize: "16px",
+        borderRadius: "6px",
+        minWidth: "96px",
+      }}
     >
       {isLoggedIn ? "Logout" : "Login"}
     </button>
