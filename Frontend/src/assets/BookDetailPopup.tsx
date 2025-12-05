@@ -228,6 +228,7 @@ const BookDetailPopup: React.FC<BookDetailPopupProps> = ({
           display: "grid",
           gridTemplateColumns: "1fr 240px",
           columnGap: "25px",
+          color: "#000",
         }}
       >
         <div>
