@@ -87,7 +87,7 @@ const LoanActionPopup: React.FC<LoanActionPopupProps> = ({
           </p>
         ) : (
           <p style={{ fontSize: "18px", marginBottom: "25px" }}>
-            Please place book on return shelf
+            Please place book on return shelf.
           </p>
         )}
 

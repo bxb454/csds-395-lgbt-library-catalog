@@ -15,6 +15,8 @@ interface Props {
 }
 
 const MyLoansTable: React.FC<Props> = ({ loans, books, onRenew, onReturn }) => {
+    const GRID_COLOR = "#9aa5bc"
+
     const getBook = useCallback(
         (bookId: number) =>
             books.find((b) => b.id === bookId) ?? ({} as BookData),
@@ -141,8 +143,8 @@ const MyLoansTable: React.FC<Props> = ({ loans, books, onRenew, onReturn }) => {
 
         muiTableBodyCellProps: {
             sx: {
-                borderRight: "1px solid #999",
-                borderBottom: "1px solid #999",
+                borderRight: `1px solid ${GRID_COLOR}`,
+                borderBottom: `1px solid ${GRID_COLOR}`,
                 py: 2,
                 px: 1,
                 "&:last-of-type": { borderRight: "none" },
@@ -150,23 +152,35 @@ const MyLoansTable: React.FC<Props> = ({ loans, books, onRenew, onReturn }) => {
         },
         muiTableHeadCellProps: {
             sx: {
-                borderRight: "1px solid #999",
-                borderBottom: "1px solid #999",
+                borderRight: `1px solid ${GRID_COLOR}`,
+                borderBottom: `1px solid ${GRID_COLOR}`,
                 py: 2,
                 px: 1,
                 "&:last-of-type": { borderRight: "none" },
+                fontWeight: 700,
+                fontSize: "15px",
+                letterSpacing: "0.01em",
+                backgroundColor: "var(--color-surface)",
+                color: "var(--color-text)",
             },
         },
 
         muiTablePaperProps: {
             elevation: 0,
-            sx: { borderRadius: 0, boxShadow: "none" },
+            sx: { borderRadius: 10, boxShadow: "none", overflow: "hidden", backgroundColor: "#fff" },
         },
     })
 
     return (
         <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
-            <div style={{ width: "1100px", border: "2px solid #999" }}>
+            <div
+                style={{
+                    width: "1100px",
+                    border: `2px solid ${GRID_COLOR}`,
+                    borderRadius: 10,
+                    boxShadow: "0 10px 28px rgba(12, 20, 38, 0.08)",
+                }}
+            >
                 <MaterialReactTable table={table} />
             </div>
         </div>

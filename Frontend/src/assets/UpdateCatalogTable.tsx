@@ -226,7 +226,15 @@ const UpdateCatalogTable: React.FC<UpdateCatalogTableProps> = ({
 
   return (
     <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
-      <Box sx={{ width: "900px", border: "2px solid #999", p: 2 }}>
+      <Box
+        sx={{
+          width: "900px",
+          border: "2px solid var(--color-border)",
+          borderRadius: "6px",
+          boxShadow: "0 10px 28px rgba(12, 20, 38, 0.08)",
+          p: 2,
+        }}
+      >
         <h3 style={{ marginTop: 0 }}>Add a New Book</h3>
         <div
           style={{

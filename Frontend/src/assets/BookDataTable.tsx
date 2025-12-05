@@ -505,16 +505,44 @@ const BookDataTable = ({
         enableRowActions: allowManagement,
         renderRowActions: allowManagement
             ? ({ row }) => (
-                <Box sx={{ display: "flex", gap: "0.5rem" }}>
+                <Box
+                    sx={{
+                        display: "flex",
+                        gap: "0.5rem",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: "100%",
+                        px: 0.5,
+                    }}
+                >
                     <IconButton
                         size="small"
+                        sx={{
+                            color: "#0c2f6e",
+                            border: "1px solid var(--color-border)",
+                            borderRadius: "10px",
+                            backgroundColor: "#f1f5fb",
+                            "&:hover": {
+                                backgroundColor: "#e7eefc",
+                                boxShadow: "0 4px 10px rgba(12, 20, 38, 0.12)",
+                            },
+                        }}
                         onClick={(event) => handleEditRow(row.original, event)}
                     >
                         <Edit fontSize="small" />
                     </IconButton>
                     <IconButton
                         size="small"
-                        color="error"
+                        sx={{
+                            color: "#c62828",
+                            border: "1px solid #e3b7b7",
+                            borderRadius: "10px",
+                            backgroundColor: "#fff6f6",
+                            "&:hover": {
+                                backgroundColor: "#fdecec",
+                                boxShadow: "0 4px 10px rgba(198, 40, 40, 0.18)",
+                            },
+                        }}
                         onClick={(event) => handleDeleteRow(row, event)}
                     >
                         <Delete fontSize="small" />
@@ -531,8 +559,8 @@ const BookDataTable = ({
             sx: {
                 py: 1.6,
                 px: 1,
-                borderRight: "1px solid #999",
-                borderBottom: "1px solid #999",
+                borderRight: "1px solid var(--color-border)",
+                borderBottom: "1px solid var(--color-border)",
                 "&:last-of-type": { borderRight: "none" },
             },
         },
@@ -540,14 +568,14 @@ const BookDataTable = ({
             sx: {
                 py: 1.6,
                 px: 1,
-                borderRight: "1px solid #999",
-                borderBottom: "1px solid #999",
+                borderRight: "1px solid var(--color-border)",
+                borderBottom: "1px solid var(--color-border)",
                 "&:last-of-type": { borderRight: "none" },
             },
         },
         muiTablePaperProps: {
             elevation: 0,
-            sx: { boxShadow: "none", borderRadius: 0 },
+            sx: { boxShadow: "none", borderRadius: "10px", overflow: "hidden" },
         },
     })
 
@@ -585,7 +613,9 @@ const BookDataTable = ({
                 <Box
                     sx={{
                         width: "900px",
-                        border: "2px solid #999",
+                        border: "2px solid var(--color-border)",
+                        borderRadius: "10px",
+                        boxShadow: "0 10px 28px rgba(12, 20, 38, 0.08)",
                     }}
                 >
                     <MaterialReactTable table={table} />

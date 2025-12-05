@@ -80,9 +80,9 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
       sx={{
         width: "100vw",
         ml: "calc(50% - 50vw)",
-        backgroundColor: "#b5c0d6",
-        borderTop: "1px solid #999",
-        borderBottom: "1px solid #999",
+        backgroundColor: "#eef3fa",
+        borderTop: "1px solid var(--color-border)",
+        borderBottom: "1px solid var(--color-border)",
         padding: "1.5rem 0",
         boxSizing: "border-box",
         position: "relative",
@@ -104,13 +104,16 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
           sx={
             isCatalog
               ? {
-                  border: "1px solid #777",
+                  border: "1px solid var(--color-border)",
                   display: "flex",
                   alignItems: "center",
                   width: "80%",
-                  height: "44px",
+                  height: "52px",
                   boxSizing: "border-box",
-                  backgroundColor: "white",
+                  backgroundColor: "#ffffff",
+                  borderRadius: "12px",
+                  boxShadow: "0 10px 24px rgba(12, 20, 38, 0.12)",
+                  overflow: "hidden",
                 }
               : {
                   width: "80%",
@@ -129,17 +132,17 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
                 sx={{
                   borderRight: "1px solid #777",
                   borderRadius: 0,
-                  height: "100%",
-                  width: "190px",
+                  height: "52px",
+                width: "190px",
                   fontSize: "18px",
                   fontWeight: 700,
-                  color: "#444",
+                  color: "#0f1e3d",
                   textTransform: "none",
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
                   px: 1.5,
-                  backgroundColor: "#eef3fa",
+                  backgroundColor: "#f1f5fb",
                 }}
               >
                 Search by
@@ -155,6 +158,7 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={() => setAnchorEl(null)}
+        PaperProps={{ sx: { minWidth: "190px" } }}
       >
         {searchOptions.map((opt) => (
           <MenuItem
@@ -185,7 +189,11 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
                 onChange={(e) => onSearchTextChange(e.target.value)}
                 sx={{
                   flex: 1,
-                  mx: 1,
+                  mx: 1.5,
+                  "& .MuiInputBase-root": {
+                    height: "52px",
+                    alignItems: "center",
+                  },
                   "& .MuiInputBase-root:before": { borderBottom: "none !important" },
                   "& .MuiInputBase-root:after": { borderBottom: "none !important" },
                 }}
@@ -211,7 +219,7 @@ const CatalogHeader: React.FC<CatalogHeaderProps> = ({
                 fontWeight: 700,
                 color: "#0c2f6e",
                 textAlign: "left",
-                transform: "translateX(-200px)",
+                transform: "translateX(-120px)",
               }}
             >
               {currentPage === "myloans" && "My Loans"}

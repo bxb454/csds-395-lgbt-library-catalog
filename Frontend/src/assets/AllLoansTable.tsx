@@ -26,6 +26,7 @@ const AllLoansTable: React.FC<Props> = ({
     onReturn,
     onRestrictToggle,
 }) => {
+    const GRID_COLOR = "#9aa5bc"
     /** Lookup helpers */
     const getUser = useCallback(
         (caseID: string | null): UserData =>
@@ -92,10 +93,16 @@ const AllLoansTable: React.FC<Props> = ({
             Cell: ({ row }) => {
                 const loan = row.original;
                 return (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                        <span>Loan date: {formatDate(loan.loanDate)}</span>
-                        <span>Due date: {formatDate(loan.dueDate)}</span>
-                        <span>numRenewals: {loan.renewalCount}</span>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <span>
+                            <strong>Loan date:</strong> {formatDate(loan.loanDate)}
+                        </span>
+                        <span>
+                            <strong>Due date:</strong> {formatDate(loan.dueDate)}
+                        </span>
+                        <span>
+                            <strong>Renewals:</strong> {loan.renewalCount}
+                        </span>
                     </div>
                 );
             },
@@ -164,6 +171,7 @@ const AllLoansTable: React.FC<Props> = ({
     const table = useMaterialReactTable({
         columns,
         data: loans,
+        muiTableProps: { sx: { borderCollapse: "collapse" } },
 
         enableSorting: false,
         enableTopToolbar: false,
@@ -175,8 +183,8 @@ const AllLoansTable: React.FC<Props> = ({
 
         muiTableBodyCellProps: {
             sx: {
-                borderRight: "1px solid #999",
-                borderBottom: "1px solid #999",
+                borderRight: `1px solid ${GRID_COLOR}`,
+                borderBottom: `1px solid ${GRID_COLOR}`,
                 py: 2,
                 px: 1,
                 "&:last-of-type": { borderRight: "none" },
@@ -185,25 +193,47 @@ const AllLoansTable: React.FC<Props> = ({
         },
         muiTableHeadCellProps: {
             sx: {
-                borderRight: "1px solid #999",
-                borderBottom: "1px solid #999",
+                borderRight: `1px solid ${GRID_COLOR}`,
+                borderBottom: `1px solid ${GRID_COLOR}`,
                 py: 2,
                 px: 1,
                 "&:last-of-type": { borderRight: "none" },
                 fontWeight: 700,
-                fontSize: "16px",
+                fontSize: "15px",
+                letterSpacing: "0.01em",
+                backgroundColor: "var(--color-surface)",
+                color: "var(--color-text)",
+            },
+        },
+        muiTableBodyRowProps: {
+            hover: true,
+            sx: {
+                transition: "background-color 120ms ease, box-shadow 120ms ease",
+                "&:hover": {
+                    backgroundColor: "#eef3fa",
+                    boxShadow: "inset 0 0 0 1px rgba(12,47,110,0.15)",
+                },
+                "&:hover td": { backgroundColor: "#eef3fa" },
             },
         },
 
         muiTablePaperProps: {
             elevation: 0,
-            sx: { borderRadius: 0, boxShadow: "none" },
+            sx: { borderRadius: 10, boxShadow: "none", overflow: "hidden", backgroundColor: "#fff" },
         },
     })
 
     return (
         <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
-            <div style={{ width: "1100px", border: "2px solid #999" }}>
+            <div
+                style={{
+                    width: "1100px",
+                    border: `2px solid ${GRID_COLOR}`,
+                    borderRadius: 6,
+                    boxShadow: "0 10px 28px rgba(12, 20, 38, 0.08)",
+                    overflow: "hidden",
+                }}
+            >
                 <MaterialReactTable table={table} />
             </div>
         </div>
