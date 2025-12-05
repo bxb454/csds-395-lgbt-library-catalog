@@ -16,8 +16,15 @@ export async function searchCatalog(query: string, limit = 20) {
         limit,
         offset: 0,
       },
+      validateStatus: (status) => status < 500,
     },
   )
+
+  if (response.status === 429) {
+    const err = new Error("Search rate limited. Please try again in a moment.")
+    ;(err as any).code = "RATE_LIMIT"
+    throw err
+  }
 
   return response.data.data
 }

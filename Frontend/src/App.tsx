@@ -142,14 +142,38 @@ function App() {
         void loadBooks({ title: query })
         return
       case "isbn":
-        void loadBooks({ isbn: query })
+        void loadBooks()
+        return
+      case "author":
+        void loadBooks()
         return
       case "keyword":
-        void loadBooks({ publisher: query })
+        void loadBooks()
         return
       case "general":
         void handleGeneralSearch(query)
         return
+      case "before date":
+      case "after date": {
+        void (async () => {
+          const isBefore = searchBy === "before date"
+          const cutoff = new Date(query)
+          if (Number.isNaN(cutoff.getTime())) {
+            setBooksError("Please enter a valid date (YYYY-MM-DD).")
+            return
+          }
+          await loadBooks()
+          setBooks((prev) =>
+            prev.filter((book) => {
+              if (!book.pubdate) return false
+              const pub = new Date(book.pubdate)
+              if (Number.isNaN(pub.getTime())) return false
+              return isBefore ? pub <= cutoff : pub >= cutoff
+            }),
+          )
+        })()
+        return
+      }
       default:
         void loadBooks()
         return

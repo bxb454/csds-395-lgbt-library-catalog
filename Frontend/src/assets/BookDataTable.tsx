@@ -4,7 +4,7 @@ import {
     useMaterialReactTable,
 } from "material-react-table"
 import { useEffect, useMemo, useState, type MouseEvent } from "react"
-import { Box, IconButton } from "@mui/material"
+import { Box, IconButton, CircularProgress } from "@mui/material"
 import { Delete, Edit } from "@mui/icons-material"
 import type { BookData } from "./Types"
 import { filterBooks, type SearchOption } from "./catalogSearch"
@@ -191,8 +191,8 @@ const BookDataTable = ({
     )
 
     const filteredData = useMemo(
-        () => filterBooks(books, searchBy, searchText),
-        [books, searchBy, searchText],
+        () => filterBooks(books, searchBy, searchText, authorsByBook, tagsByBook),
+        [books, searchBy, searchText, authorsByBook, tagsByBook],
     )
 
     useEffect(() => {
@@ -554,6 +554,17 @@ const BookDataTable = ({
         },
     })
 
+    if (loading) {
+        return (
+            <Box sx={{ width: "100%", display: "flex", justifyContent: "center", mt: 4 }}>
+                <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
+                    <CircularProgress size={36} />
+                    <div style={{ color: "#555", fontSize: 14 }}>Loading catalog…</div>
+                </Box>
+            </Box>
+        )
+    }
+
     return (
         <>
             <Box sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
@@ -564,11 +575,6 @@ const BookDataTable = ({
                     }}
                 >
                     <MaterialReactTable table={table} />
-                    {loading && (
-                        <div style={{ padding: "12px", textAlign: "center" }}>
-                            Loading books...
-                        </div>
-                    )}
                     {error && (
                         <div
                             style={{
@@ -583,7 +589,6 @@ const BookDataTable = ({
                     )}
                 </Box>
             </Box>
-
             {selectedBook && (
                 <BookDetailPopup
                     book={selectedBook}
